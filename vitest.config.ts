@@ -1,10 +1,12 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { parseEnv } from "node:util";
 import { defineConfig } from "vitest/config";
 
-// Database-backed tests read DATABASE_URL from .env.local and skip when it isn't set.
-// (Next's own env loader deliberately ignores .env.local when NODE_ENV=test.)
-if (existsSync(".env.local")) process.loadEnvFile(".env.local");
+// Database tests write rows, so they run only against an explicit TEST_DATABASE_URL (a Neon branch
+// for tests or CI), never the app's DATABASE_URL. Without one, they skip.
+const localEnv = existsSync(".env.local") ? parseEnv(readFileSync(".env.local", "utf8")) : {};
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL ?? localEnv.TEST_DATABASE_URL ?? "";
 
 export default defineConfig({
   resolve: {
