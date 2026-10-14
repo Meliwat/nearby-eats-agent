@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closingMinuteAt, isOpenAt, localDateAfter, parseHours, toLocalDayMinute } from "./hours";
+import { closingMinuteAt, isOpenAt, localDateAfter, parseHours, resolveArrival, toLocalDayMinute } from "./hours";
 
 const SUN = 0, MON = 1, TUE = 2, WED = 3, FRI = 5, SAT = 6;
 const at = (hour: number, minute = 0) => hour * 60 + minute;
@@ -94,5 +94,32 @@ describe("localDateAfter", () => {
     const lateEvening = new Date("2026-10-31T03:30:00Z");
     expect(localDateAfter(lateEvening, 0, "America/Los_Angeles")).toBe("2026-10-30");
     expect(localDateAfter(lateEvening, 2, "America/Los_Angeles")).toBe("2026-11-01");
+  });
+});
+
+describe("resolveArrival", () => {
+  // Wednesday 2026-10-14, 9:00pm in Los Angeles.
+  const wednesdayNight = new Date("2026-10-15T04:00:00Z");
+  const LA = "America/Los_Angeles";
+
+  it("uses the current time when none is given", () => {
+    expect(resolveArrival(wednesdayNight, LA, 0, null)).toMatchObject({ day: WED, minute: at(21), rolledToTomorrow: false });
+  });
+
+  it("rolls a time that already passed today to tomorrow", () => {
+    expect(resolveArrival(wednesdayNight, LA, 0, "00:30")).toEqual({
+      day: 4,
+      minute: at(0, 30),
+      daysFromToday: 1,
+      rolledToTomorrow: true,
+    });
+  });
+
+  it("keeps a just-passed time today within the grace period", () => {
+    expect(resolveArrival(wednesdayNight, LA, 0, "20:30")).toMatchObject({ day: WED, daysFromToday: 0, rolledToTomorrow: false });
+  });
+
+  it("never rolls an explicit future day", () => {
+    expect(resolveArrival(wednesdayNight, LA, 2, "08:00")).toMatchObject({ day: FRI, daysFromToday: 2, rolledToTomorrow: false });
   });
 });

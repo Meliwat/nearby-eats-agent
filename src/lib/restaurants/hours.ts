@@ -105,6 +105,32 @@ export function localDateAfter(date: Date, daysAhead: number, timeZone: string):
   return new Date(Date.UTC(year, month - 1, day + daysAhead)).toISOString().slice(0, 10);
 }
 
+/** "Lunch at 12" asked at 12:40 still means today; anything earlier than this means tomorrow. */
+export const PAST_TIME_GRACE_MINUTES = 60;
+
+/**
+ * Turns "days from today + HH:MM" into a concrete arrival. A time that has already passed today
+ * (beyond a grace period) means the next occurrence: "12:30am" asked at 9pm is tomorrow's 12:30am.
+ */
+export function resolveArrival(
+  now: Date,
+  timeZone: string,
+  daysFromToday: number,
+  time: string | null,
+): { day: DayOfWeek; minute: number; daysFromToday: number; rolledToTomorrow: boolean } {
+  const local = toLocalDayMinute(now, timeZone);
+  const minute = time === null ? local.minute : clockToMinute(time);
+  const rolledToTomorrow = daysFromToday === 0 && minute < local.minute - PAST_TIME_GRACE_MINUTES;
+  const days = rolledToTomorrow ? 1 : daysFromToday;
+  return { day: ((local.day + days) % 7) as DayOfWeek, minute, daysFromToday: days, rolledToTomorrow };
+}
+
+/** "19:30" -> 1170 */
+export function clockToMinute(time: string): number {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
 /** Day of week and minute of day for `date` in the given IANA time zone. */
 export function toLocalDayMinute(date: Date, timeZone: string): { day: DayOfWeek; minute: number } {
   const parts = new Intl.DateTimeFormat("en-US", {

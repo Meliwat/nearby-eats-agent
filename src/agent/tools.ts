@@ -8,9 +8,8 @@ import {
   closingMinuteAt,
   DAY_NAMES,
   localDateAfter,
+  resolveArrival,
   RESTAURANT_TIME_ZONE as TIME_ZONE,
-  toLocalDayMinute,
-  type DayOfWeek,
 } from "@/lib/restaurants/hours";
 import { formatMinute, searchRestaurants, type SearchFilters, type SearchResult } from "@/lib/restaurants/search";
 import { FACT_KEY_NAMES, FACT_KEYS, MAX_FACT_VALUE_LENGTH, rememberFact, type FactChange } from "./facts";
@@ -39,6 +38,10 @@ export interface ToolOutcome {
   isError: boolean;
   factChanges: FactChange[];
 }
+
+/** Name lookups are for a specific place; a near-empty query would return the whole catalog. */
+const MIN_NAME_QUERY_LENGTH = 3;
+const MAX_NAME_MATCHES = 5;
 
 const clockTime = z
   .string()
@@ -70,7 +73,7 @@ function buildInputSchemas(cities: string[]) {
       avoid_cash_only: z.boolean().describe("True if they can't pay cash"),
     }),
     get_restaurant: z.strictObject({
-      name: z.string().describe("Restaurant name, or part of it"),
+      name: z.string().min(MIN_NAME_QUERY_LENGTH).describe(`Restaurant name, or at least ${MIN_NAME_QUERY_LENGTH} letters of it`),
     }),
     remember_fact: z.strictObject({
       key: z.enum(FACT_KEY_NAMES).describe(
@@ -221,11 +224,8 @@ function runSearch(input: z.infer<ToolSchemas["search_restaurants"]>, ctx: ToolC
   const daysFromToday = input.days_from_today ?? 0;
   if (daysFromToday > 0 && input.time === null) return failure("time is required when searching a future day");
 
-  const local = toLocalDayMinute(ctx.now, TIME_ZONE);
-  const day = ((local.day + daysFromToday) % 7) as DayOfWeek;
-  const minute = input.time === null ? local.minute : clockToMinute(input.time);
-
-  const arrival = { day, minute, daysFromToday };
+  const { day, minute, rolledToTomorrow, ...resolved } = resolveArrival(ctx.now, TIME_ZONE, daysFromToday, input.time);
+  const arrival = { day, minute, daysFromToday: resolved.daysFromToday };
   const result = searchRestaurants(ctx.catalog, {
     arrival,
     diets: input.diets,
@@ -243,6 +243,7 @@ function runSearch(input: z.infer<ToolSchemas["search_restaurants"]>, ctx: ToolC
     factChanges: [],
     output: {
       arrival: `${DAY_NAMES[day]} ${formatMinute(minute)}`,
+      ...(rolledToTomorrow && { note: "That time already passed today, so this searched tomorrow. Tell the user." }),
       candidate_count: result.candidates.length,
       candidates: result.candidates.map(describeForModel),
       excluded: result.excluded.map((e) => `${e.name}: ${e.reasons.map((r) => r.detail).join("; ")}`),
@@ -252,7 +253,7 @@ function runSearch(input: z.infer<ToolSchemas["search_restaurants"]>, ctx: ToolC
 
 function runGetRestaurant(input: z.infer<ToolSchemas["get_restaurant"]>, ctx: ToolContext): ToolOutcome {
   const query = input.name.toLowerCase();
-  const matches = ctx.catalog.filter((r) => r.name.toLowerCase().includes(query));
+  const matches = ctx.catalog.filter((r) => r.name.toLowerCase().includes(query)).slice(0, MAX_NAME_MATCHES);
   if (matches.length === 0) return failure(`No restaurant matches "${input.name}"`);
   return { output: matches.map(describeForModel), isError: false, factChanges: [] };
 }
@@ -361,11 +362,6 @@ function describeForModel(r: CatalogRestaurant) {
     cash_only: r.cashOnly,
     description: r.context,
   };
-}
-
-function clockToMinute(time: string): number {
-  const [hours, minutes] = time.split(":").map(Number);
-  return hours * 60 + minutes;
 }
 
 function failure(message: string): ToolOutcome {
