@@ -10,13 +10,13 @@ import { buildTools, executeTool, type ToolContext, type ToolSchemas } from "./t
 
 export const MODEL = "claude-sonnet-5-5";
 /** Chat replies need speed more than deep reasoning; hard constraints are enforced in code. */
-const EFFORT = "low";
+export const EFFORT = "low";
 /** Upper bound on model calls per user message, so a confused loop can't run up cost. */
-const MAX_STEPS = 8;
+export const MAX_STEPS = 8;
 /** Thinking and the reply share this budget; a texting-length reply plus low-effort thinking fits easily. */
 const MAX_TOKENS = 4_000;
 /** The chat route's maxDuration is 60s; past this, the model is asked to wrap up without more tools. */
-const TURN_BUDGET_MS = 40_000;
+export const TURN_BUDGET_MS = 40_000;
 
 const FALLBACK_REPLY = "Sorry, I lost my train of thought there. What are you in the mood for?";
 const FAILURE_REPLY = "Sorry, something went wrong on my end. Try that again?";
@@ -167,6 +167,8 @@ function callModel(
   const stream = client.beta.messages.stream({
     model: MODEL,
     max_tokens: MAX_TOKENS,
+    // Adaptive is this model's default; stated explicitly so the request shows what runs.
+    thinking: { type: "adaptive" },
     system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
     // Also cache the growing conversation, so each step in a turn re-reads earlier steps from cache.
     cache_control: { type: "ephemeral" },

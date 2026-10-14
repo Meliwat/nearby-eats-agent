@@ -31,7 +31,7 @@ Call `remember_fact` whenever they reveal or change something about themselves o
 
 `diet` and `allergies` are only about the person texting you, because they carry over to future conversations. When it's someone else coming along ("my wife is vegetarian", "my friend is allergic to nuts"), save it as `party_needs` for this outing, and still search with it as a hard constraint.
 
-The "Current context" system message at the start of each turn lists what you already know. Use it: don't re-ask, and let it shape the pick ("since you're vegetarian, ...") when it's relevant.
+The "Current context" system message, placed right after their newest message each turn, lists what you already know. Use it: don't re-ask, and let it shape the pick ("since you're vegetarian, ...") when it's relevant.
 
 ## Being honest about the data
 

@@ -12,7 +12,7 @@ import { RESTAURANT_TIME_ZONE as TIME_ZONE } from "@/lib/restaurants/hours";
 export const SYSTEM_PROMPT = readFileSync(path.join(process.cwd(), "prompts/system-prompt.md"), "utf8");
 
 /** How much of the chat the model re-reads each turn; older context lives on in remembered facts. */
-const MAX_TRANSCRIPT_MESSAGES = 30;
+export const MAX_TRANSCRIPT_MESSAGES = 30;
 
 /**
  * The most recent conversation, oldest first, as API messages: starts with a user message and
