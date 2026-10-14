@@ -5,7 +5,7 @@ import type { StoredAgentEvent } from "@/agent/events";
 import type { ChatMessage } from "./chat-app";
 import { ActivityIndicator, type Activity } from "./activity-indicator";
 import { PollCard, pollIdFor } from "./group-poll";
-import { Bubble, StreamingBubble } from "./message-bubble";
+import { Bubble, TypingBubble } from "./message-bubble";
 import { RecommendationCard, recommendationFor } from "./recommendation-card";
 
 const STARTERS = [
@@ -18,10 +18,9 @@ const STARTERS = [
 interface Props {
   messages: ChatMessage[];
   eventsByTurn: Record<string, StoredAgentEvent[]>;
-  draft: string | null;
-  /** The server finished the reply; once it's fully revealed, onDraftRevealed commits it. */
-  draftFinished: boolean;
-  onDraftRevealed: () => void;
+  /** A reply being typed out on screen; onReplyTyped commits it once fully shown. */
+  typingReply: string | null;
+  onReplyTyped: () => void;
   activity: Activity | null;
   error: string | null;
   busy: boolean;
@@ -31,9 +30,8 @@ interface Props {
 export function ChatThread({
   messages,
   eventsByTurn,
-  draft,
-  draftFinished,
-  onDraftRevealed,
+  typingReply,
+  onReplyTyped,
   activity,
   error,
   busy,
@@ -44,7 +42,7 @@ export function ChatThread({
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, draft, activity]);
+  }, [messages, typingReply, activity]);
 
   function submit(text: string) {
     const trimmed = text.trim();
@@ -88,7 +86,7 @@ export function ChatThread({
           );
         })}
 
-        {draft && <StreamingBubble text={draft} finished={draftFinished} onRevealed={onDraftRevealed} />}
+        {typingReply && <TypingBubble text={typingReply} onTyped={onReplyTyped} />}
         {activity && <ActivityIndicator activity={activity} />}
         {error && <p className="text-center text-sm text-red-600">{error}</p>}
         <div ref={bottomRef} />

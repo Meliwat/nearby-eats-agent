@@ -19,10 +19,8 @@ export function ChatApp() {
   const [facts, setFacts] = useState<Fact[]>([]);
   /** Fact keys changed during the latest turn, highlighted in the inspector. */
   const [changedKeys, setChangedKeys] = useState<string[]>([]);
-  /** The finished reply's text while the thread types it out. */
-  const [draft, setDraft] = useState<string | null>(null);
-  /** The finished reply, committed to the transcript once the typewriter has revealed all of it. */
-  const [finishedReply, setFinishedReply] = useState<ChatMessage | null>(null);
+  /** The reply that just arrived, typed out on screen, then committed to the transcript. */
+  const [typingReply, setTypingReply] = useState<ChatMessage | null>(null);
   const [activity, setActivity] = useState<Activity | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"chat" | "inspector">("chat");
@@ -74,22 +72,19 @@ export function ChatApp() {
         break;
       case "done":
         setActivity(null);
-        setDraft(message.text);
-        setFinishedReply({ id: message.assistantMessageId, role: "assistant", content: message.text });
+        setTypingReply({ id: message.assistantMessageId, role: "assistant", content: message.text });
         break;
       case "error":
         setError(message.message);
         setActivity(null);
-        setDraft(null);
-        break;
+                break;
     }
   }, []);
 
   /** Ends a turn that can't complete: show why, and take back the unsent message bubble. */
   const failTurn = useCallback((message: string) => {
     setMessages((current) => current.filter((m) => m.id !== PENDING_USER_ID));
-    setDraft(null);
-    setActivity(null);
+        setActivity(null);
     setError(message);
   }, []);
 
@@ -128,14 +123,13 @@ export function ChatApp() {
     [conversationId, handleStreamMessage, failTurn],
   );
 
-  const commitFinishedReply = useCallback(() => {
-    if (!finishedReply) return;
-    setMessages((current) => [...current, finishedReply]);
-    setFinishedReply(null);
-    setDraft(null);
-  }, [finishedReply]);
+  const commitTypedReply = useCallback(() => {
+    if (!typingReply) return;
+    setMessages((current) => [...current, typingReply]);
+    setTypingReply(null);
+  }, [typingReply]);
 
-  const busy = draft !== null || activity !== null;
+  const busy = typingReply !== null || activity !== null;
 
   return (
     <div className="flex h-dvh flex-col bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
@@ -171,9 +165,8 @@ export function ChatApp() {
           <ChatThread
             messages={messages}
             eventsByTurn={eventsByTurn}
-            draft={draft}
-            draftFinished={finishedReply !== null}
-            onDraftRevealed={commitFinishedReply}
+            typingReply={typingReply?.content ?? null}
+            onReplyTyped={commitTypedReply}
             activity={activity}
             error={error}
             busy={busy}

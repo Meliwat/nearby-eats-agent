@@ -22,25 +22,25 @@ export function Bubble({ role, text, children }: { role: "user" | "assistant"; t
   );
 }
 
-/** The reply arriving: revealed with a typewriter so a burst of text reads as it streams. */
-export function StreamingBubble({ text, finished, onRevealed }: { text: string; finished: boolean; onRevealed: () => void }) {
+/** A finished reply, typed out on screen; onTyped fires once all of it is showing. */
+export function TypingBubble({ text, onTyped }: { text: string; onTyped: () => void }) {
   const shown = useTypewriter(text);
-  const revealed = shown.length === text.length;
+  const typed = shown.length === text.length;
 
   useEffect(() => {
-    if (finished && revealed) onRevealed();
-  }, [finished, revealed, onRevealed]);
+    if (typed) onTyped();
+  }, [typed, onTyped]);
 
   return (
     <Bubble role="assistant" text={shown}>
-      {!revealed || !finished ? <span className="caret ml-0.5 text-emerald-600">▍</span> : null}
+      {typed ? null : <span className="caret ml-0.5 text-emerald-600">▍</span>}
     </Bubble>
   );
 }
 
 /**
- * Reveals `target` a few characters per animation frame, faster the further behind it is, so
- * the model's replies (which arrive in one fast burst after its tool calls) read as they stream.
+ * Reveals `target` a few characters per animation frame, faster the further behind it is. The reply
+ * arrives all at once when the turn ends; typing it out reads more like a text than a page load.
  */
 function useTypewriter(target: string): string {
   const [length, setLength] = useState(0);
