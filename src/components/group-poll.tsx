@@ -26,8 +26,18 @@ export function usePoll(pollId: string) {
     // Polling an external source: state updates happen after each fetch resolves.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
-    const timer = setInterval(() => void refresh(), REFRESH_MS);
-    return () => clearInterval(timer);
+    // Background tabs skip refreshes (they share the per-IP read limit) and catch up when shown again.
+    const timer = setInterval(() => {
+      if (!document.hidden) void refresh();
+    }, REFRESH_MS);
+    const onVisible = () => {
+      if (!document.hidden) void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [refresh]);
 
   return { poll, setPoll, missing };
