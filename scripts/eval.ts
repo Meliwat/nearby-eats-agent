@@ -84,6 +84,17 @@ const SCENARIOS: Scenario[] = [
         : null;
     },
   },
+  {
+    // Regression: with only the visible transcript, the model once told a user to ignore its
+    // earlier (fully searched) picks as "given without searching".
+    name: "Later turns don't disown earlier, searched picks",
+    turns: ["where should I eat tonight? I only eat halal", "actually I eat everything now", "how many people fit there?"],
+    check: (t) => {
+      const disowning = /without (searching|checking)|didn'?t (search|check)|ignore my (earlier|previous)/i;
+      const bad = t.replies.find((reply) => disowning.test(reply));
+      return bad ? `disowned earlier picks: "${bad}"` : null;
+    },
+  },
 ];
 
 async function runScenario(scenario: Scenario): Promise<string | null> {
