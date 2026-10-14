@@ -172,7 +172,7 @@ export async function executeTool(
   schemas: ToolSchemas,
   ctx: ToolContext,
 ): Promise<ToolOutcome> {
-  if (!(name in schemas)) return failure(`Unknown tool "${name}". Available: ${Object.keys(schemas).join(", ")}`);
+  if (!Object.hasOwn(schemas, name)) return failure(`Unknown tool "${name}". Available: ${Object.keys(schemas).join(", ")}`);
   const toolName = name as ToolName;
   const parsed = schemas[toolName].safeParse(rawInput);
   if (!parsed.success) return failure(`Invalid input: ${z.prettifyError(parsed.error)}`);
@@ -308,7 +308,20 @@ async function runUpdateRecommendation(
   if (!latest) return failure(`Restaurant ${input.restaurant_id} was not recommended in this conversation.`);
 
   await db.update(recommendations).set({ status: input.status }).where(eq(recommendations.id, latest.id));
-  if (input.status === "rejected") ctx.rejectedIds.add(input.restaurant_id);
+  if (input.status === "rejected") {
+    ctx.rejectedIds.add(input.restaurant_id);
+    // Also move it out of this turn's candidates, so it can't be recommended again before the next search.
+    const search = ctx.lastSearch;
+    const rejected = search?.candidates.find((r) => r.id === input.restaurant_id);
+    if (search && rejected) {
+      search.candidates = search.candidates.filter((r) => r !== rejected);
+      search.excluded.push({
+        id: rejected.id,
+        name: rejected.name,
+        reasons: [{ code: "already_rejected", detail: "user already passed on it" }],
+      });
+    }
+  }
   return { output: { restaurant_id: input.restaurant_id, status: input.status }, isError: false, factChanges: [] };
 }
 
