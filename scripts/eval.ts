@@ -9,6 +9,7 @@ import { db } from "../src/db/client";
 import { conversations, users } from "../src/db/schema";
 import type { StoredAgentEvent, StreamMessage } from "../src/agent/events";
 import { runTurn } from "../src/agent/loop";
+import { castVote } from "../src/agent/polls";
 import { RESTAURANT_ATTRIBUTES } from "../src/lib/restaurants/attributes";
 
 interface Transcript {
@@ -16,9 +17,12 @@ interface Transcript {
   replies: string[];
 }
 
+/** A user message, or a setup step run between messages (e.g. friends voting on a poll). */
+type Step = string | ((t: Transcript, newUser: () => Promise<string>) => Promise<void>);
+
 interface Scenario {
   name: string;
-  turns: string[];
+  turns: Step[];
   /** Returns a failure message, or null if the agent behaved. */
   check: (t: Transcript) => string | null;
 }
@@ -27,6 +31,8 @@ const toolCalls = (t: Transcript, name: string) =>
   t.events.flatMap((e) => (e.type === "tool_call" && e.payload.name === name && !e.payload.isError ? [e.payload] : []));
 const picks = (t: Transcript) => toolCalls(t, "recommend_restaurant").map((p) => (p.output as { recommended: string }).recommended);
 const lastSearchInput = (t: Transcript) => toolCalls(t, "search_restaurants").at(-1)?.input as Record<string, unknown> | undefined;
+const appliedDiets = (t: Transcript) =>
+  toolCalls(t, "search_restaurants").map((p) => (p.output as { applied_constraints: { diets: string[] } }).applied_constraints.diets);
 
 /** Every place the data says isn't for kids, or is 21+, at 9:30pm. */
 const NOT_FOR_KIDS_AT_930PM = RESTAURANT_ATTRIBUTES.filter(
@@ -103,10 +109,52 @@ const SCENARIOS: Scenario[] = [
       return bad ? `disowned earlier picks: "${bad}"` : null;
     },
   },
+  {
+    name: "A vegetarian's diet holds when they ask for fried chicken later",
+    turns: ["dinner tonight at 7, I'm vegetarian", "actually I'm craving fried chicken, what's good?"],
+    check: (t) => {
+      const diets = appliedDiets(t);
+      if (diets.length < 2) return "didn't search on both turns";
+      if (diets.some((d) => !d.includes("vegetarian"))) return `a search ran without vegetarian: ${JSON.stringify(diets)}`;
+      return picks(t).includes("Hearth & Hen") ? "recommended Hearth & Hen to a vegetarian" : null;
+    },
+  },
+  {
+    // Regression from a live chat: the agent guessed how many kids hadn't voted yet, then broke a
+    // tie in favor of the option whose only vote came with "I hate both".
+    name: "Poll tie: a vote with a complaint counts for less, and no guessing who's left",
+    turns: [
+      "dinner for 4 tomorrow at 6 with my kids, they never agree. can they vote?",
+      async (t, newUser) => {
+        const poll = toolCalls(t, "start_group_poll").at(-1);
+        if (!poll) return;
+        const [first, second] = (poll.input as { options: { restaurant_id: number }[] }).options;
+        const pollId = (poll.output as { poll_id: string }).poll_id;
+        await castVote({ pollId, voterId: await newUser(), restaurantId: first.restaurant_id, voterName: "Max", note: "I hate both" });
+        await castVote({ pollId, voterId: await newUser(), restaurantId: second.restaurant_id, voterName: "Ana", note: null });
+      },
+      "votes are in. just pick one",
+    ],
+    check: (t) => {
+      const poll = toolCalls(t, "start_group_poll").at(-1);
+      if (!poll) return "never started a poll";
+      const options = poll.output as { options: string[] };
+      const pick = picks(t).at(-1);
+      if (pick !== options.options[1]) return `picked ${pick ?? "nothing"}, not ${options.options[1]} (the vote without a complaint)`;
+      const guessed = t.replies.find((reply) => /haven'?t voted|yet to vote|still (waiting|need)|more votes/i.test(reply));
+      return guessed ? `guessed at missing voters: "${guessed}"` : null;
+    },
+  },
 ];
 
 async function runScenario(scenario: Scenario): Promise<string | null> {
   const [user] = await db.insert(users).values({}).returning();
+  const extraUsers: string[] = [];
+  const newUser = async () => {
+    const [created] = await db.insert(users).values({}).returning();
+    extraUsers.push(created.id);
+    return created.id;
+  };
   try {
     const [conversation] = await db.insert(conversations).values({ userId: user.id }).returning();
     const transcript: Transcript = { events: [], replies: [] };
@@ -117,13 +165,16 @@ async function runScenario(scenario: Scenario): Promise<string | null> {
     // runTurn rethrows after logging a failed turn. Its placeholder reply could satisfy a check by
     // accident, so a failed turn fails the scenario (and only this scenario).
     try {
-      for (const text of scenario.turns) await runTurn({ userId: user.id, conversationId: conversation.id, text }, collect);
+      for (const step of scenario.turns) {
+        if (typeof step === "string") await runTurn({ userId: user.id, conversationId: conversation.id, text: step }, collect);
+        else await step(transcript, newUser);
+      }
     } catch (error) {
       return `a turn failed: ${error instanceof Error ? error.message : String(error)}`;
     }
     return scenario.check(transcript);
   } finally {
-    await db.delete(users).where(eq(users.id, user.id));
+    for (const id of [user.id, ...extraUsers]) await db.delete(users).where(eq(users.id, id));
   }
 }
 
