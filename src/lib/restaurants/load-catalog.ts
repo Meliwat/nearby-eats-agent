@@ -22,10 +22,13 @@ async function fetchCatalog(): Promise<CatalogRestaurant[]> {
     db.select().from(restaurants).orderBy(restaurants.id),
     db.select().from(restaurantHours),
   ]);
+  const hoursByRestaurant = Map.groupBy(hours, (h) => h.restaurantId);
   return rows.map((row) => ({
     ...row,
-    hours: hours
-      .filter((h) => h.restaurantId === row.id)
-      .map(({ day, openMinute, closeMinute }) => ({ day: day as DayOfWeek, openMinute, closeMinute })),
+    hours: (hoursByRestaurant.get(row.id) ?? []).map(({ day, openMinute, closeMinute }) => ({
+      day: day as DayOfWeek,
+      openMinute,
+      closeMinute,
+    })),
   }));
 }
