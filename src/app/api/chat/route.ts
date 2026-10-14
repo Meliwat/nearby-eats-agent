@@ -3,7 +3,8 @@ import { db } from "@/db/client";
 import { conversations } from "@/db/schema";
 import type { StreamMessage } from "@/agent/events";
 import { runTurn } from "@/agent/loop";
-import { clientIp, consumeLimits, LIMITS, tooManyRequests } from "@/lib/rate-limit";
+import { clientIp, LIMITS, tooManyRequests } from "@/lib/rate-limit";
+import { consumeLimits } from "@/lib/rate-limit-store";
 import { getOrCreateUserId, ownsConversation } from "@/lib/session";
 
 /** A turn is a handful of model calls; leave headroom over the usual few seconds. */

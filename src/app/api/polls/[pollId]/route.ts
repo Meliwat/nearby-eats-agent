@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { castVote, getPollView } from "@/agent/polls";
-import { clientIp, consumeLimits, LIMITS, tooManyRequests } from "@/lib/rate-limit";
+import { clientIp, LIMITS, tooManyRequests } from "@/lib/rate-limit";
+import { consumeLimits } from "@/lib/rate-limit-store";
 import { getOrCreateUserId, getUserId } from "@/lib/session";
 
 const voteRequest = z.strictObject({
