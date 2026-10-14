@@ -174,7 +174,10 @@ async function runScenario(scenario: Scenario): Promise<string | null> {
     }
     return scenario.check(transcript);
   } finally {
-    for (const id of [user.id, ...extraUsers]) await db.delete(users).where(eq(users.id, id));
+    // Each delete stands alone, so one failure can't leave the rest behind or hide other scenarios' results.
+    for (const id of [user.id, ...extraUsers]) {
+      await db.delete(users).where(eq(users.id, id)).catch((error) => console.error(`cleanup failed for user ${id}`, error));
+    }
   }
 }
 
