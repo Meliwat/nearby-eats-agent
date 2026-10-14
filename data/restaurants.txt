@@ -1,0 +1,464 @@
+TRYNEARBY — RESTAURANT DATA
+Orange County, CA. 50 restaurants.
+
+Format per entry: name, address, cuisine, price, hours, and free-form context.
+Price is $ (under $15/person), $$ ($15–30), $$$ ($30–60), $$$$ ($60+).
+
+================================================================================
+
+1. Pollo Verde
+1832 W 1st St, Santa Ana, CA 92703
+Cuisine: Mexican, grilled chicken
+Price: $
+Hours: Daily 10am–10pm
+Context: Counter service, charcoal-grilled chicken, sides of rice and beans. Very
+family-friendly, high chairs available, kids eat free on Tuesdays. Large portions.
+Gluten-free options if you skip the tortillas. No alcohol. Parking lot in back.
+Gets loud at dinner. Cash and card.
+
+2. Saffron House
+4521 Barranca Pkwy, Irvine, CA 92604
+Cuisine: North Indian
+Price: $$
+Hours: Tue–Sun 11:30am–2:30pm, 5pm–9:30pm. Closed Mondays.
+Context: Extensive vegetarian menu, roughly half the dishes. Several vegan options
+if you ask them to hold the ghee and cream. Lunch buffet on weekdays. Spice level
+is adjustable but default is genuinely hot. Good for groups. Street parking is
+tight at dinner.
+
+3. Crust & Crumb
+17320 Beach Blvd, Huntington Beach, CA 92647
+Cuisine: Bakery, sandwiches, coffee
+Price: $
+Hours: Daily 6:30am–3pm
+Context: Sourdough bakery with a small lunch menu. Vegetarian-friendly, a few vegan
+pastries. Great for breakfast or a working morning, lots of outlets and wifi.
+Not a dinner spot. Line out the door on weekend mornings. Dog-friendly patio.
+
+4. Ironwood Subs
+1290 N Euclid St, Anaheim, CA 92801
+Cuisine: Deli, sandwiches
+Price: $
+Hours: Mon–Sat 10am–8pm, Sun 10am–5pm
+Context: Old-school Italian deli. Hot and cold subs, house-roasted meats. Limited
+vegetarian options, essentially one veggie sub. Fast, cheap, good for takeout and
+large catering orders. Eight seats inside. No frills.
+
+5. Kettle Ramen Bar
+3033 Bristol St, Costa Mesa, CA 92626
+Cuisine: Japanese, ramen
+Price: $$
+Hours: Daily 11:30am–10pm
+Context: Tonkotsu, shoyu, and a legitimately good vegan miso ramen with mushroom
+broth. Bar seating, counter-facing. Not great for groups over four. No reservations
+and the wait can hit 45 minutes on Friday nights. Gluten-free noodle swap available.
+
+6. Bluebird Cafe
+12150 Rosecrans Ave, Norwalk, CA 90650
+Cuisine: American breakfast, diner
+Price: $
+Hours: Daily 6am–2pm
+Context: Classic diner. Big breakfasts, bottomless coffee, booths. Family-friendly
+and very kid-tolerant. Limited vegetarian options beyond eggs and pancakes. Cash
+only. Small parking lot that fills by 9am on weekends.
+
+7. Slice Theory Pizza
+12932 Newport Ave, Tustin, CA 92780
+Cuisine: Pizza, Italian-American
+Price: $$
+Hours: Sun–Thu 11am–10pm, Fri–Sat 11am–midnight
+Context: New York style by the slice or whole pie. Vegan cheese available. Several
+vegetarian pies. Good late-night option. Beer and wine. Counter order, sit wherever.
+Gets crowded after 9pm on weekends with a younger crowd.
+
+8. Hearth & Hen
+305 E Chapman Ave, Orange, CA 92866
+Cuisine: Southern, fried chicken
+Price: $$
+Hours: Wed–Sun 11am–9pm. Closed Mon–Tue.
+Context: Fried chicken, biscuits, collards. Very little for vegetarians and nothing
+for vegans. Sides are mostly cooked with pork. Great for a date or a group dinner.
+Full bar, good cocktails. In Old Towne Orange, walkable area with parking structure
+nearby.
+
+9. Cocoa Lane
+1500 E Imperial Hwy, Brea, CA 92821
+Cuisine: Dessert, chocolate, coffee
+Price: $
+Hours: Daily 11am–10pm
+Context: Dessert only. Chocolates, cakes, hot chocolate, espresso. Vegan and
+gluten-free options clearly marked. Good for an after-dinner stop or a casual
+first date. Small, maybe twenty seats. Very kid-friendly.
+
+10. Nonna Rosa Pizzeria
+9211 Chapman Ave, Garden Grove, CA 92841
+Cuisine: Italian
+Price: $$
+Hours: Tue–Sun 4pm–10pm. Closed Mondays.
+Context: Family-run red sauce Italian. Big portions, meant for sharing. Several
+vegetarian pastas, limited vegan. Kids menu. Great for birthdays and large family
+groups, they'll push tables together. Takes reservations for 6+. BYOB with a
+corkage fee.
+
+11. Vista Pizza Co
+2340 N Harbor Blvd, Fullerton, CA 92835
+Cuisine: Pizza
+Price: $
+Hours: Daily 11am–11pm
+Context: Delivery-focused, small dine-in area. Cheap, fast, reliable. Vegan cheese
+on request. Student crowd given the proximity to campus. Open late. Good for a
+group watching a game.
+
+12. Tacos El Camino
+14281 Beach Blvd, Westminster, CA 92683
+Cuisine: Mexican, tacos
+Price: $
+Hours: Daily 9am–11pm, Fri–Sat until 1am
+Context: Taqueria with a walk-up window and a few outdoor tables. Al pastor off the
+trompo. Vegetarian options limited to beans, cheese, and nopales. Cash preferred
+though they take card. Very late night. Not a sit-down experience.
+
+13. Verdant Kitchen
+2855 Main St, Irvine, CA 92614
+Cuisine: Vegetarian, vegan, health-focused
+Price: $$
+Hours: Mon–Sat 8am–8pm, Sun 9am–4pm
+Context: Entirely plant-based. Bowls, salads, cold-pressed juice. Gluten-free
+options throughout. Popular with the lunch crowd from nearby offices. Quiet,
+bright, good for a working lunch or a quiet conversation. Not kid-oriented.
+
+14. Mangal Grill
+7021 Beach Blvd, Buena Park, CA 90620
+Cuisine: Turkish, Mediterranean
+Price: $$
+Hours: Daily 11am–10pm
+Context: Kebabs, pide, mezze. Strong vegetarian mezze selection, several vegan.
+Halal. Good for groups, meze plates are meant to be shared. No alcohol. Baklava
+is the move. Family-friendly, often multigenerational tables.
+
+15. Harbor Gyro House
+4120 E Anaheim St, Long Beach, CA 90804
+Cuisine: Greek
+Price: $
+Hours: Mon–Sat 10:30am–9pm. Closed Sundays.
+Context: Counter service gyros and plates. Vegetarian option is the falafel plate,
+which is good. Tiny, maybe six tables, mostly takeout. Fast and cheap. Street
+parking only.
+
+16. The Blue Anchor
+3309 W Coast Hwy, Newport Beach, CA 92663
+Cuisine: Seafood
+Price: $$$
+Hours: Daily 11:30am–10pm
+Context: Fresh fish, oyster bar, whole grilled branzino. Almost nothing for
+vegetarians or vegans. Several gluten-free preparations. Water views from the
+patio, best at sunset. Reservations strongly recommended on weekends. Valet $12.
+Good for a date or a special occasion.
+
+17. Sabor Noodle Bar
+525 N Main St, Santa Ana, CA 92701
+Cuisine: Vietnamese
+Price: $
+Hours: Daily 9am–9pm
+Context: Pho, bun, banh mi. Vegetarian pho available with vegetable broth, not just
+noodles in water. Fast, casual, big bowls. Family-friendly. Cash only. Gets a long
+line at lunch but it moves.
+
+18. Olive & Thyme Bistro
+2601 E Coast Hwy, Corona del Mar, CA 92625
+Cuisine: Mediterranean, Californian
+Price: $$$
+Hours: Tue–Sun 11am–9pm. Closed Mondays.
+Context: Seasonal menu, lots of vegetables. Good vegetarian options, some vegan on
+request. Full bar, strong wine list. Quiet enough for conversation. Takes
+reservations. Nice for a date or dinner with parents. Not a kid place.
+
+19. Seoul Fire BBQ
+9550 Garden Grove Blvd, Garden Grove, CA 92844
+Cuisine: Korean BBQ
+Price: $$$
+Hours: Daily 11am–midnight
+Context: All-you-can-eat grill at the table. Very little for vegetarians, essentially
+banchan. Loud, fun, great for groups and birthdays. Minimum two people. Open very
+late. Ventilation is good but you will smell like smoke. Reservations for 6+.
+
+20. Little Deli
+305 N Glassell St, Orange, CA 92866
+Cuisine: Sandwiches, deli
+Price: $
+Hours: Mon–Fri 8am–4pm, Sat 9am–3pm. Closed Sundays.
+Context: Small sandwich counter, maybe five seats. Weekday lunch spot. One solid
+vegetarian sandwich, no vegan options. Order ahead by phone and it's ready in ten
+minutes. Not a destination, but reliable.
+
+21. Casa Verde
+1105 S Bristol St, Santa Ana, CA 92704
+Cuisine: Mexican, Oaxacan
+Price: $$
+Hours: Wed–Mon 11am–9pm. Closed Tuesdays.
+Context: Mole, tlayudas, mezcal. Several vegetarian dishes, a couple genuinely vegan.
+Full bar with a deep mezcal list. Good for a date or a group dinner. Patio with
+string lights. Gets busy Friday and Saturday nights, reservations help.
+
+22. Prospect Creamery
+1870 Harbor Blvd, Costa Mesa, CA 92627
+Cuisine: Ice cream, dessert
+Price: $
+Hours: Daily noon–10pm, Fri–Sat until 11pm
+Context: Small-batch ice cream, several vegan coconut-base flavors. Gluten-free
+cones available. Very kid-friendly, lines on summer evenings. Walk-up window plus
+a few benches. Cash and card.
+
+23. Field & Vine
+280 S Brea Blvd, Brea, CA 92821
+Cuisine: New American, farm-to-table
+Price: $$$
+Hours: Wed–Sun 5pm–10pm. Closed Mon–Tue.
+Context: Opened recently. Rotating seasonal menu, vegetable-forward. Good vegetarian
+options, vegan tasting menu with 48 hours notice. Full bar. Date spot. Takes
+reservations and they book out about a week. Small dining room, not for big groups.
+
+24. Grand Dumplings
+8822 Valley View St, Buena Park, CA 90620
+Cuisine: Chinese, Northern
+Price: $
+Hours: Daily 11am–9:30pm
+Context: Hand-folded dumplings, hand-pulled noodles. Vegetarian dumplings available
+and good. Cash only. Family-style, large round tables, great for groups. Very
+kid-friendly. No alcohol. Expect a wait on weekends.
+
+25. Walnut Poke
+1313 S Walnut St, Anaheim, CA 92802
+Cuisine: Hawaiian, poke
+Price: $
+Hours: Mon–Sat 11am–8pm, Sun 11am–6pm
+Context: Build-your-own poke bowls. Raw fish focus. Vegetarian option is tofu, which
+is fine. Gluten-free if you skip the sauces, they'll tell you which. Quick lunch,
+mostly takeout. Six seats.
+
+26. First Street Bakery
+1201 E 1st St, Santa Ana, CA 92701
+Cuisine: Mexican bakery, pan dulce
+Price: $
+Hours: Daily 5am–8pm
+Context: Conchas, bolillos, tres leches. Cash only. Vegetarian throughout, vegan
+options unclear so ask. Very early open, good for a pre-work stop. No seating,
+takeout only. Family-run.
+
+27. Villa Wings
+15431 Springdale St, Huntington Beach, CA 92649
+Cuisine: American, wings, sports bar
+Price: $$
+Hours: Daily 11am–midnight, Fri–Sat until 2am
+Context: Wings, burgers, twenty beers on tap, screens everywhere. Nothing for vegans,
+one veggie burger. 21+ after 9pm. Loud. Good for groups watching a game, bad for
+conversation or kids after dinner hour. Free parking.
+
+28. Sugarpine
+164 N Glassell St, Orange, CA 92866
+Cuisine: Bakery, cafe
+Price: $
+Hours: Tue–Sun 7am–4pm. Closed Mondays.
+Context: Small-batch pastries, good espresso. Several vegan and gluten-free options
+labeled on the case. Quiet, good for reading or a casual meeting. Twelve seats plus
+a patio. Dog-friendly outside.
+
+29. Mesa Ridge Steakhouse
+3151 Airway Ave, Costa Mesa, CA 92626
+Cuisine: Steakhouse
+Price: $$$$
+Hours: Daily 5pm–10pm
+Context: Dry-aged steaks, classic sides, deep wine list. Essentially nothing for
+vegetarians or vegans. Jackets not required but people dress up. Best for a special
+occasion, anniversary, or a business dinner. Reservations required. Valet only.
+
+30. Pho Lantern
+10121 Westminster Ave, Garden Grove, CA 92843
+Cuisine: Vietnamese
+Price: $
+Hours: Daily 8am–9pm
+Context: Pho specialist, broth simmered overnight. Vegetarian pho available.
+Family-friendly, high chairs, very fast service. Cash and card. Large parking lot.
+Not much atmosphere, people come for the food.
+
+31. Zaytoon Grill
+1625 W Katella Ave, Anaheim, CA 92802
+Cuisine: Lebanese, Middle Eastern
+Price: $$
+Hours: Daily 11am–10pm
+Context: Shawarma, mezze, fresh pita. Excellent vegetarian and vegan options, most
+of the mezze is plant-based. Halal. No alcohol. Good for groups. Near the
+convention center so it gets busy during events.
+
+32. The Copper Pot
+18685 Main St, Huntington Beach, CA 92648
+Cuisine: Soup, sandwiches, comfort food
+Price: $
+Hours: Mon–Sat 10am–7pm. Closed Sundays.
+Context: Rotating daily soups, half of them vegetarian. A couple vegan. Small,
+counter service, good for a quick solo lunch. Soup in bread bowls. Not a dinner
+spot and not for groups.
+
+33. Mariscos del Puerto
+1402 W 5th St, Santa Ana, CA 92703
+Cuisine: Mexican seafood
+Price: $$
+Hours: Daily 10am–9pm
+Context: Ceviche, aguachile, whole fried fish, shrimp cocktails. Seafood focused,
+little for vegetarians. Michelada list. Loud and lively on weekends with live music
+Saturday afternoons. Family-friendly during the day. Big portions meant to share.
+
+34. Green Light Juice
+4255 Campus Dr, Irvine, CA 92612
+Cuisine: Juice, smoothies, acai
+Price: $
+Hours: Mon–Fri 7am–6pm, Sat–Sun 8am–4pm
+Context: Cold-pressed juice, smoothie bowls, a few wraps. All vegetarian, mostly
+vegan. Gluten-free throughout. Quick grab-and-go, four seats. Popular pre and
+post-gym. Not a meal destination for most people.
+
+35. Barrio Tacos y Mezcal
+207 N Broadway, Santa Ana, CA 92701
+Cuisine: Mexican
+Price: $$
+Hours: Tue–Sun 4pm–midnight. Closed Mondays.
+Context: Tacos, small plates, big mezcal and tequila program. Several vegetarian
+tacos including a good mushroom one. 21+ after 9pm. Patio, DJ on weekends. Date
+spot or a night out with friends. Not for kids in the evening.
+
+36. Bay Street Fish Co
+2100 E Ocean Blvd, Long Beach, CA 90803
+Cuisine: Seafood, casual
+Price: $$
+Hours: Daily 11am–9pm
+Context: Fish and chips, grilled fish plates, chowder. Order at the counter, sit on
+the patio. Almost nothing for vegetarians. Kid-friendly, casual, walkable from the
+beach. Gets busy summer weekends. Metered street parking.
+
+37. Olive Tree Falafel
+12881 Harbor Blvd, Garden Grove, CA 92840
+Cuisine: Middle Eastern, falafel
+Price: $
+Hours: Mon–Sat 10am–9pm, Sun 11am–7pm
+Context: Falafel, hummus, shawarma. Almost entirely vegetarian-friendly and much of
+it vegan. Halal. Fast counter service. Ten seats. Great cheap lunch. No alcohol.
+
+38. Rosewood Tea Room
+133 W Wilshire Ave, Fullerton, CA 92832
+Cuisine: Tea, light bites, British
+Price: $$
+Hours: Wed–Sun 11am–5pm. Closed Mon–Tue.
+Context: Afternoon tea service, scones, finger sandwiches. Vegetarian and vegan tea
+services available with notice. Reservations required for full tea. Quiet, good for
+a birthday or a visit with a grandparent. Not a casual drop-in.
+
+39. Smoke & Oak BBQ
+1875 N Tustin St, Orange, CA 92865
+Cuisine: Barbecue, Texas-style
+Price: $$
+Hours: Wed–Sun 11am until sold out, usually around 7pm. Closed Mon–Tue.
+Context: Brisket, ribs, sausage. They sell out early on weekends, go before 2pm.
+Nothing for vegans, sides are mostly meat-adjacent. Picnic tables, paper trays.
+Good for groups, order by the pound. Beer only.
+
+40. Kinoko Izakaya
+2721 W Lincoln Ave, Anaheim, CA 92801
+Cuisine: Japanese, izakaya
+Price: $$$
+Hours: Daily 5pm–1am
+Context: Small plates, yakitori, sake list. Some vegetarian options, limited vegan.
+Dark, intimate, good for a date or drinks with a few people. 21+ after 10pm. Open
+very late. Reservations for 4+.
+
+41. Mama's Kitchen
+8471 Westminster Blvd, Westminster, CA 92683
+Cuisine: Filipino
+Price: $
+Hours: Daily 9am–8pm
+Context: Adobo, sisig, lumpia, turo-turo style steam table. Very little for
+vegetarians. Cheap, generous portions, cafeteria setup. Family-friendly. Cash
+preferred. Not atmospheric, it's about the food.
+
+42. Harvest Table
+1500 Adams Ave, Costa Mesa, CA 92626
+Cuisine: American brunch
+Price: $$
+Hours: Daily 8am–3pm
+Context: Brunch focused. Pancakes, hash, egg dishes, mimosas. Good vegetarian
+options, a few vegan, gluten-free bread available. Very popular, 45-minute wait on
+weekend mornings without a reservation. Family-friendly. Patio seating.
+
+43. Noodle Alley
+14041 Brookhurst St, Garden Grove, CA 92843
+Cuisine: Thai
+Price: $
+Hours: Daily 11am–9:30pm
+Context: Pad thai, curries, noodle soups. Most dishes can be made vegetarian or
+vegan, they're used to the request. Spice level 1 to 5 and 4 is genuinely hot.
+Fast, casual, cheap. Good for takeout. Twenty seats.
+
+44. The Cellar Door
+121 W Birch St, Brea, CA 92821
+Cuisine: Wine bar, small plates
+Price: $$$
+Hours: Tue–Sat 4pm–11pm. Closed Sun–Mon.
+Context: Wine by the glass, cheese and charcuterie, a few warm plates. Vegetarian
+options on the board, limited vegan. 21+ at all times. Quiet, good for a date or a
+serious conversation. No kids. Street parking.
+
+45. Sunrise Donuts
+2110 S Euclid St, Anaheim, CA 92802
+Cuisine: Donuts, coffee
+Price: $
+Hours: Daily 4:30am–1pm
+Context: Classic OC donut shop. Cash only. Opens very early. Vegetarian by default,
+vegan options limited. Four tables. Good for a pre-dawn start or a box for the
+office. Nothing fancy.
+
+46. Tandoor & Co
+2305 Michelson Dr, Irvine, CA 92612
+Cuisine: Indian, South Indian
+Price: $$
+Hours: Daily 11am–3pm, 5pm–10pm
+Context: Dosas, idli, and a North Indian menu alongside. Large vegetarian section,
+many naturally vegan dishes. Gluten-free dosa batter. Weekday lunch thali is a good
+deal. Good for groups and for families. No alcohol.
+
+47. The Lantern Room
+3400 Avenue of the Arts, Costa Mesa, CA 92626
+Cuisine: Contemporary, tasting menu
+Price: $$$$
+Hours: Thu–Sat 6pm–9:30pm. Closed Sun–Wed.
+Context: Fixed tasting menu, around twelve courses. Vegetarian tasting menu available
+with 72 hours notice, vegan possible but call first. Reservations only, books out
+three to four weeks. Special occasion only. No children under 12. Valet.
+
+48. Beachwood Burgers
+16871 Pacific Coast Hwy, Sunset Beach, CA 90742
+Cuisine: Burgers, American
+Price: $
+Hours: Daily 10:30am–9pm
+Context: Smash burgers, fries, shakes. One veggie burger, no vegan options. Walk-up
+counter with picnic tables. Very kid-friendly. Casual, sandy, near the beach. Cash
+and card. Small lot, street parking otherwise.
+
+49. Sabina's Table
+424 N Main St, Orange, CA 92868
+Cuisine: Peruvian
+Price: $$
+Hours: Tue–Sun 11am–9pm. Closed Mondays.
+Context: Lomo saltado, ceviche, aji de gallina. Some vegetarian options, limited
+vegan. Pisco sours. Good for a date or a small group. Quiet on weeknights, busier
+Fridays. Takes reservations. Street parking in Old Towne.
+
+50. Golden Wok
+9471 Chapman Ave, Garden Grove, CA 92841
+Cuisine: Chinese, Cantonese
+Price: $
+Hours: Daily 11am–9:30pm
+Context: Dim sum until 3pm, full Cantonese menu after. Vegetarian dim sum available
+though limited. Large round tables, lazy susans, built for groups and families.
+Very kid-friendly. Cash and card. Big parking lot. Loud at peak dim sum hours.
+
+================================================================================
+END OF FILE
