@@ -1,8 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { conversations, users } from "@/db/schema";
+import { conversations, messages, users } from "@/db/schema";
 
 const USER_COOKIE = "nearby_uid";
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
@@ -43,4 +43,23 @@ export async function ownsConversation(userId: string, conversationId: string): 
     .from(conversations)
     .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)));
   return Boolean(row);
+}
+
+/** Longer than any turn can run (the chat route's maxDuration is 60s). */
+const TURN_IN_PROGRESS_MS = 70_000;
+
+/**
+ * True while the conversation's latest message is a recent user message with no reply yet. Every
+ * finished turn stores a reply (or a failure placeholder), so this means a turn is still running,
+ * e.g. the same chat open in two tabs. Two requests in the same instant can both pass; that window
+ * is small and the cost is one out-of-order turn.
+ */
+export async function hasTurnInProgress(conversationId: string, now = new Date()): Promise<boolean> {
+  const [latest] = await db
+    .select({ role: messages.role, createdAt: messages.createdAt })
+    .from(messages)
+    .where(eq(messages.conversationId, conversationId))
+    .orderBy(desc(messages.createdAt))
+    .limit(1);
+  return latest?.role === "user" && now.getTime() - latest.createdAt.getTime() < TURN_IN_PROGRESS_MS;
 }

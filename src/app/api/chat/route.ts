@@ -5,7 +5,7 @@ import type { StreamMessage } from "@/agent/events";
 import { runTurn } from "@/agent/loop";
 import { clientIp, LIMITS, noNulBytes, rejectCrossSite, rejectLargeBody, tooManyRequests } from "@/lib/rate-limit";
 import { consumeLimits, deleteExpiredCounters } from "@/lib/rate-limit-store";
-import { getOrCreateUserId, ownsConversation } from "@/lib/session";
+import { getOrCreateUserId, hasTurnInProgress, ownsConversation } from "@/lib/session";
 
 /** A turn is a handful of model calls; leave headroom over the usual few seconds. */
 export const maxDuration = 60;
@@ -45,6 +45,8 @@ export async function POST(request: Request) {
     [{ id: conversationId }] = await db.insert(conversations).values({ userId }).returning({ id: conversations.id });
   } else if (!(await ownsConversation(userId, conversationId))) {
     return Response.json({ error: "Conversation not found" }, { status: 404 });
+  } else if (await hasTurnInProgress(conversationId)) {
+    return Response.json({ error: "Still working on your last message. One moment." }, { status: 409 });
   }
 
   const encoder = new TextEncoder();
