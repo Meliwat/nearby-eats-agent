@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { catalogFromSource } from "./catalog";
-import { isOpenThrough, type DayOfWeek } from "./hours";
+import { isOpenAt, type DayOfWeek } from "./hours";
 import { parseRestaurantFile } from "./parse-source";
 import { formatMinute, MIN_VISIT_MINUTES, searchRestaurants, type SearchFilters } from "./search";
 
@@ -37,12 +37,17 @@ describe("searchRestaurants", () => {
     for (const excluded of result.excluded) expect(excluded.reasons.length).toBeGreaterThan(0);
   });
 
-  it("only returns places open long enough to eat, for every arrival hour of the week", () => {
+  it("only returns places open for every minute of the visit, for every arrival hour of the week", () => {
+    // Checked minute by minute with isOpenAt, independently of the isOpenThrough logic search uses.
     for (let day = 0; day < 7; day++) {
       for (let hour = 0; hour < 24; hour++) {
         const arrival = { day: day as DayOfWeek, minute: at(hour), daysFromToday: 0 };
         for (const r of searchRestaurants(catalog, filters({ arrival })).candidates) {
-          expect(isOpenThrough(r.hours, arrival.day, arrival.minute, MIN_VISIT_MINUTES), `${r.name} ${day} ${hour}`).toBe(true);
+          for (let offset = 0; offset < MIN_VISIT_MINUTES; offset++) {
+            const minute = arrival.minute + offset;
+            const visitDay = (minute >= 24 * 60 ? (day + 1) % 7 : day) as DayOfWeek;
+            expect(isOpenAt(r.hours, visitDay, minute % (24 * 60)), `${r.name} day ${day} ${hour}:00 +${offset}m`).toBe(true);
+          }
         }
       }
     }
@@ -93,12 +98,13 @@ describe("searchRestaurants", () => {
       catalog,
       filters({ maxPriceTier: 2, cities: ["Santa Ana"], avoidCashOnly: true, excludeIds: [21] }),
     );
+    expect(result.candidates.length).toBeGreaterThan(0);
     for (const r of result.candidates) {
       expect(r.priceTier).toBeLessThanOrEqual(2);
       expect(r.city).toBe("Santa Ana");
       expect(r.cashOnly).toBe(false);
     }
-    expect(result.candidates.map((r) => r.id)).not.toContain(21);
+    expect(result.excluded.find((e) => e.id === 21)?.reasons.map((r) => r.code)).toContain("already_rejected");
   });
 });
 
