@@ -49,7 +49,7 @@ erDiagram
         text value "at most 100 characters"
         enum scope "user (durable) | conversation (this outing)"
         enum status "active | superseded"
-        uuid supersedes FK "the fact this one replaced"
+        uuid supersedes FK "the fact this one replaced, set null on delete"
         timestamptz created_at
     }
     agent_events {
@@ -130,6 +130,7 @@ turn rebuilds the model's context from the database:
 | Source | Role in the conversation |
 |---|---|
 | `messages` | The last 30 visible messages, which the model re-reads every turn. |
+| `agent_events` (latest search) | The hard constraints the conversation's last search applied, carried into this turn's searches. |
 | `agent_events` (tool calls only) | A one-line-per-call trace placed before each past reply, so the model remembers what it *did* (searched, picked), not just what it said. Never the full tool results. |
 | `user_facts` (status = active) | What the agent currently believes: durable `user` facts plus this conversation's `conversation` facts. |
 | `recommendations` + `restaurants` | What was already suggested and how the person reacted. Rejected places are excluded from later searches. |
@@ -161,9 +162,10 @@ tokens per day). Counters older than two days are deleted on the first chat of e
 ## Deletion
 
 Deleting a user removes everything they own (cascading foreign keys); restaurants are never
-cascaded. The app has no "delete conversation" action. If one were added, note that a fact's
-provenance (`conversation_id`, `source_message_id`) cascades, so durable facts learned in that
-conversation would go with it; it would need `SET NULL` provenance for `user`-scope facts first.
+cascaded. The app has no "delete conversation" action. If one were added: a fact's provenance
+(`conversation_id`, `source_message_id`) cascades, so durable facts learned in that conversation
+would be deleted with it, and a later fact that had superseded one of them keeps working with its
+`supersedes` link set to null.
 
 ## Why this shape
 
