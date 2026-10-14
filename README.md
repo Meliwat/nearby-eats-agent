@@ -8,28 +8,27 @@
 
 ## Example
 
-*From testing, lightly trimmed.*
+*A real run, verbatim.*
 
 > **You:** where should I eat tonight
 >
-> **Nearby:** Pretty wide open, so one question: how many of you, and are any kids coming? That decides whether I send you somewhere loud and family-style or somewhere quieter.
+> **Nearby:** Happy to help. What are you in the mood for tonight: tacos, noodles, pizza, something fancier, or something else?
 >
 > **You:** me and my wife plus our 2 kids, she's vegetarian
 >
-> **Nearby:** Try Mangal Grill in Buena Park. It's a Turkish place that welcomes kids, and the vegetarian mezze is great for your wife, with kebabs for everyone else and plates made for sharing. Get the baklava. Open until 10, no alcohol. I'm assuming you'd eat around 6:30.
+> **Nearby:** Try Tandoor & Co in Irvine. They have a big vegetarian section, with dosas and lots of North Indian dishes, so your wife will have plenty to pick from. They welcome families, and it's open until 10 tonight. I'm assuming you want to be there around 7. Spice is adjustable, so ask for mild for the kids.
 
-What the inspector showed, abbreviated:
+The second message answers a different question than the one asked, and the agent simply works with it. What the inspector showed, abbreviated:
 
 ```
 turn 1   search_restaurants     Wed 7pm [no extra constraints]: 38 fit, 12 ruled out
-         remember_fact          timing = tonight                   (this outing)
-         → 38 places fit and the party would change the answer, so it asks before picking
+         → 38 places fit, so it asks one question before picking
 
-turn 2   remember_fact          party_size = 4 people              (this outing)
-         remember_fact          party_needs = wife is vegetarian   (this outing)
-         remember_fact          kids = 2 kids                      (remembered)
-         search_restaurants     Wed 6:30pm [vegetarian; with kids; party of 4]: 28 fit, 22 ruled out
-         recommend_restaurant   picked Mangal Grill                (checked against that search)
+turn 2   remember_fact          party_size = 4 people (2 adults, 2 kids)   (this outing)
+         remember_fact          party_needs = wife is vegetarian           (this outing)
+         remember_fact          kids = 2 kids coming                       (remembered)
+         search_restaurants     Wed 7pm [vegetarian; with kids; party of 4]: 28 fit, 22 ruled out
+         recommend_restaurant   picked Tandoor & Co                        (checked against that search)
 ```
 
 Every recorded pick (the card under the reply) must come from a search the code ran that turn, and the reply is written after all of that turn's tool calls. Code doesn't check that the reply's wording names the same place; the prompt and the evals cover that. Every fact is stored with the message it came from. Every model call, tool call, and change to memory is logged and shown as it happens.
@@ -40,7 +39,7 @@ Every recorded pick (the card under the reply) must come from a search the code 
 
 **Recommendations.** When the agent recommends, it names one place and the reasons it fits *you*: the details you gave, matched against the restaurant's own description, plus one practical note (the wait, the parking, cash only, what to order). `recommend_restaurant` only accepts a candidate from the search the agent ran that turn, so a pick always satisfies every constraint that search applied: open long enough to eat, diets, kids and 21+ rules, party size, budget, area, and cash. Within a conversation, diets, kids, and no-cash carry forward to every later search until the agent drops them by name; party size and budget carry forward until dropped or replaced with a new value; area and time are set per search. Facts remembered from earlier conversations reach the model as context, not as search filters.
 
-**Conversation.** The prompt keeps replies to about sixty words and has the agent recommend early, asking a question only when the answer would change which restaurant wins. These are prompt rules, checked by the behavior evals rather than enforced in code. Otherwise it states its assumption out loud ("I'm assuming you'd eat around 6:30") and lets you correct it. Fragments, changes of mind, and answers to a different question are all simply new information.
+**Conversation.** The prompt keeps replies to about sixty words and has the agent recommend early, asking a question only when the answer would change which restaurant wins. These are prompt rules, checked by the behavior evals rather than enforced in code. Otherwise it states its assumption out loud ("I'm assuming you want to be there around 7") and lets you correct it. Fragments, changes of mind, and answers to a different question are all simply new information.
 
 **Memory.** What you reveal becomes a fact: one row each, with provenance. Each kind of fact has a fixed lifetime in code; the model only chooses which kind it learned. *Vegetarian* is remembered for next time; *party of 6 tonight* belongs to this outing only. When you change your mind, the old fact is marked superseded and the new one points back at it, so the history survives. Ten messages in, the agent knows your diet, your kids, your budget, your part of town, and what you've already turned down.
 
