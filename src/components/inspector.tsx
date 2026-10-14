@@ -33,9 +33,7 @@ export function Inspector({ messages, eventsByTurn, facts, changedKeys }: Props)
                 }`}
               >
                 <span className="text-stone-500">{fact.key}</span> {fact.value}
-                <span className="ml-1.5 text-[10px] text-stone-400">
-                  {fact.scope === "user" ? "remembered" : "this outing"}
-                </span>
+                <span className="ml-1.5 text-[10px] text-stone-400">{scopeLabel(fact.scope)}</span>
               </li>
             ))}
           </ul>
@@ -109,7 +107,7 @@ function EventRow({ event }: { event: StoredAgentEvent }) {
           <span className="font-medium text-amber-800 dark:text-amber-300">context {label}</span>{" "}
           <span className="font-mono">{p.key}</span>:{" "}
           {p.action === "superseded" && <span className="text-stone-500 line-through">{p.previousValue}</span>}{" "}
-          {p.value} <span className="text-stone-400">({p.scope === "user" ? "remembered" : "this outing"})</span>
+          {p.value} <span className="text-stone-400">({scopeLabel(p.scope)})</span>
         </li>
       );
     }
@@ -131,6 +129,10 @@ function JsonBlock({ label, value }: { label: string; value: unknown }) {
       </pre>
     </div>
   );
+}
+
+function scopeLabel(scope: Fact["scope"]): string {
+  return scope === "user" ? "remembered" : "this outing";
 }
 
 function seconds(ms: number): string {
