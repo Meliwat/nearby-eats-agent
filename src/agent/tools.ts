@@ -173,10 +173,11 @@ export async function executeTool(
   ctx: ToolContext,
 ): Promise<ToolOutcome> {
   if (!(name in schemas)) return failure(`Unknown tool "${name}". Available: ${Object.keys(schemas).join(", ")}`);
-  const parsed = schemas[name as keyof ToolSchemas].safeParse(rawInput);
+  const toolName = name as ToolName;
+  const parsed = schemas[toolName].safeParse(rawInput);
   if (!parsed.success) return failure(`Invalid input: ${z.prettifyError(parsed.error)}`);
   try {
-    return await runTool(name, parsed.data, ctx);
+    return await runTool(toolName, parsed.data, ctx);
   } catch (error) {
     // Infrastructure trouble inside one tool (e.g. a database hiccup) goes back to the model as a
     // tool error it can work around, instead of failing the whole turn.
@@ -185,42 +186,26 @@ export async function executeTool(
   }
 }
 
-async function runTool(name: string, input: unknown, ctx: ToolContext): Promise<ToolOutcome> {
-  switch (name) {
-    case "search_restaurants":
-      return runSearch(input as z.infer<ToolSchemas["search_restaurants"]>, ctx);
-    case "get_restaurant":
-      return runGetRestaurant(input as z.infer<ToolSchemas["get_restaurant"]>, ctx);
-    case "remember_fact": {
-      if (ctx.readThirdPartyText) {
-        return failure(
-          "Not saved: this turn read friends' poll notes, which are not the user's own words. Use them in the search, and ask the user if something should be remembered.",
-        );
-      }
-      const { key, value } = input as z.infer<ToolSchemas["remember_fact"]>;
-      const change = await rememberFact({
-        userId: ctx.userId,
-        conversationId: ctx.conversationId,
-        sourceMessageId: ctx.turnMessageId,
-        key,
-        value,
-      });
-      return { output: change, isError: false, factChanges: [change] };
-    }
-    case "recommend_restaurant":
-      return runRecommend(input as z.infer<ToolSchemas["recommend_restaurant"]>, ctx);
-    case "update_recommendation":
-      return runUpdateRecommendation(input as z.infer<ToolSchemas["update_recommendation"]>, ctx);
-    case "start_group_poll":
-      return runStartGroupPoll(input as z.infer<ToolSchemas["start_group_poll"]>, ctx);
-    case "get_poll_results":
-      return runGetPollResults(input as z.infer<ToolSchemas["get_poll_results"]>, ctx);
-    default:
-      return failure(`Unhandled tool "${name}"`);
-  }
+type ToolName = keyof ToolSchemas;
+type ToolInput<Name extends ToolName> = z.infer<ToolSchemas[Name]>;
+type ToolHandler<Name extends ToolName> = (input: ToolInput<Name>, ctx: ToolContext) => ToolOutcome | Promise<ToolOutcome>;
+
+const TOOL_HANDLERS: { [Name in ToolName]: ToolHandler<Name> } = {
+  search_restaurants: runSearch,
+  get_restaurant: runGetRestaurant,
+  remember_fact: runRememberFact,
+  recommend_restaurant: runRecommend,
+  update_recommendation: runUpdateRecommendation,
+  start_group_poll: runStartGroupPoll,
+  get_poll_results: runGetPollResults,
+};
+
+/** Generic over the tool name so each handler receives its own input type without casts. */
+function runTool<Name extends ToolName>(name: Name, input: ToolInput<Name>, ctx: ToolContext) {
+  return TOOL_HANDLERS[name](input, ctx);
 }
 
-function runSearch(input: z.infer<ToolSchemas["search_restaurants"]>, ctx: ToolContext): ToolOutcome {
+function runSearch(input: ToolInput<"search_restaurants">, ctx: ToolContext): ToolOutcome {
   const daysFromToday = input.days_from_today ?? 0;
   if (daysFromToday > 0 && input.time === null) return failure("time is required when searching a future day");
 
@@ -251,14 +236,30 @@ function runSearch(input: z.infer<ToolSchemas["search_restaurants"]>, ctx: ToolC
   };
 }
 
-function runGetRestaurant(input: z.infer<ToolSchemas["get_restaurant"]>, ctx: ToolContext): ToolOutcome {
+function runGetRestaurant(input: ToolInput<"get_restaurant">, ctx: ToolContext): ToolOutcome {
   const query = input.name.toLowerCase();
   const matches = ctx.catalog.filter((r) => r.name.toLowerCase().includes(query)).slice(0, MAX_NAME_MATCHES);
   if (matches.length === 0) return failure(`No restaurant matches "${input.name}"`);
   return { output: matches.map(describeForModel), isError: false, factChanges: [] };
 }
 
-async function runRecommend(input: z.infer<ToolSchemas["recommend_restaurant"]>, ctx: ToolContext): Promise<ToolOutcome> {
+async function runRememberFact(input: ToolInput<"remember_fact">, ctx: ToolContext): Promise<ToolOutcome> {
+  if (ctx.readThirdPartyText) {
+    return failure(
+      "Not saved: this turn read friends' poll notes, which are not the user's own words. Use them in the search, and ask the user if something should be remembered.",
+    );
+  }
+  const change = await rememberFact({
+    userId: ctx.userId,
+    conversationId: ctx.conversationId,
+    sourceMessageId: ctx.turnMessageId,
+    key: input.key,
+    value: input.value,
+  });
+  return { output: change, isError: false, factChanges: [change] };
+}
+
+async function runRecommend(input: ToolInput<"recommend_restaurant">, ctx: ToolContext): Promise<ToolOutcome> {
   // Grounding check: the model may only recommend what the code verified this turn.
   if (!ctx.lastSearch) return failure("Call search_restaurants first so the user's constraints are checked.");
   const candidate = ctx.lastSearch.candidates.find((r) => r.id === input.restaurant_id);
@@ -295,7 +296,7 @@ async function runRecommend(input: z.infer<ToolSchemas["recommend_restaurant"]>,
 }
 
 async function runUpdateRecommendation(
-  input: z.infer<ToolSchemas["update_recommendation"]>,
+  input: ToolInput<"update_recommendation">,
   ctx: ToolContext,
 ): Promise<ToolOutcome> {
   const [latest] = await db
@@ -311,7 +312,7 @@ async function runUpdateRecommendation(
   return { output: { restaurant_id: input.restaurant_id, status: input.status }, isError: false, factChanges: [] };
 }
 
-async function runStartGroupPoll(input: z.infer<ToolSchemas["start_group_poll"]>, ctx: ToolContext): Promise<ToolOutcome> {
+async function runStartGroupPoll(input: ToolInput<"start_group_poll">, ctx: ToolContext): Promise<ToolOutcome> {
   if (!ctx.lastSearch) return failure("Call search_restaurants first so every option fits the group.");
   const ids = input.options.map((option) => option.restaurant_id);
   if (new Set(ids).size !== ids.length) return failure("Each option must be a different restaurant.");
@@ -330,7 +331,7 @@ async function runStartGroupPoll(input: z.infer<ToolSchemas["start_group_poll"]>
   };
 }
 
-async function runGetPollResults(input: z.infer<ToolSchemas["get_poll_results"]>, ctx: ToolContext): Promise<ToolOutcome> {
+async function runGetPollResults(input: ToolInput<"get_poll_results">, ctx: ToolContext): Promise<ToolOutcome> {
   const [poll] = await db.select({ conversationId: groupPolls.conversationId }).from(groupPolls).where(eq(groupPolls.id, input.poll_id));
   if (!poll || poll.conversationId !== ctx.conversationId) return failure("No poll with that id in this conversation.");
   const view = await getPollView(input.poll_id, ctx.userId);
