@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { agentEvents, messages, recommendations, restaurants } from "@/db/schema";
+import { appliedConstraintsSchema, NO_CONSTRAINTS, type AppliedConstraints } from "./constraints";
 import type { ActiveFact } from "./facts";
 import type { ToolCallPayload } from "./tool-summary";
 import { trimTranscript, withActionNotes } from "./transcript";
@@ -93,4 +94,24 @@ export function buildContextMessage(
     "Group polls in this conversation (votes per option):",
     ...(polls.length ? polls.map((p) => `- ${p}`) : ["- none"]),
   ].join("\n");
+}
+
+/** The hard constraints the conversation's most recent successful search applied, to carry into this turn. */
+export async function loadCarriedConstraints(conversationId: string): Promise<AppliedConstraints> {
+  const [latest] = await db
+    .select({ payload: agentEvents.payload })
+    .from(agentEvents)
+    .where(
+      and(
+        eq(agentEvents.conversationId, conversationId),
+        eq(agentEvents.type, "tool_call"),
+        sql`${agentEvents.payload}->>'name' = 'search_restaurants'`,
+        sql`${agentEvents.payload}->>'isError' = 'false'`,
+      ),
+    )
+    .orderBy(desc(agentEvents.id))
+    .limit(1);
+  const output = (latest?.payload as { output?: { applied_constraints?: unknown } } | undefined)?.output;
+  const parsed = appliedConstraintsSchema.safeParse(output?.applied_constraints);
+  return parsed.success ? parsed.data : NO_CONSTRAINTS;
 }

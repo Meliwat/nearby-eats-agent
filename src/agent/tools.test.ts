@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { catalogFromSource } from "@/lib/restaurants/catalog";
 import { parseRestaurantFile } from "@/lib/restaurants/parse-source";
 import { searchRestaurants } from "@/lib/restaurants/search";
+import { NO_CONSTRAINTS } from "./constraints";
 import { buildTools, executeTool, type ToolContext } from "./tools";
 
 // The guards under test refuse before touching the database; the stub makes any DB use fail loudly.
@@ -41,6 +42,7 @@ function context(overrides: Partial<ToolContext> = {}): ToolContext {
     rejectedIds: new Set(),
     readThirdPartyText: false,
     conversationReadThirdPartyText: false,
+    constraints: NO_CONSTRAINTS,
     lastSearch: null,
     ...overrides,
   };
@@ -103,6 +105,32 @@ describe("executeTool", () => {
       context({ conversationReadThirdPartyText: true }),
     );
     expect(errorOf(outcome)).toMatch(/long-term preferences/);
+  });
+
+  it("keeps an earlier diet even when a later search leaves it out", async () => {
+    const forgetfulSearch = {
+      days_from_today: 0,
+      time: "19:00",
+      diets: [],
+      with_kids: false,
+      party_size: null,
+      max_price_tier: null,
+      cities: [],
+      avoid_cash_only: false,
+      drop_constraints: [],
+    };
+    const ctx = context({ constraints: { ...NO_CONSTRAINTS, diets: ["vegetarian"] } });
+    const output = (await executeTool("search_restaurants", forgetfulSearch, schemas, ctx)).output as {
+      carried_over: string[];
+      candidates: { name: string }[];
+    };
+    expect(output.carried_over).toEqual(["vegetarian"]);
+    expect(output.candidates.map((c) => c.name)).not.toContain("Hearth & Hen");
+
+    // Only an explicit drop lifts it.
+    const dropped = (await executeTool("search_restaurants", { ...forgetfulSearch, drop_constraints: ["vegetarian"] }, schemas, ctx))
+      .output as { candidates: { name: string }[] };
+    expect(dropped.candidates.map((c) => c.name)).toContain("Hearth & Hen");
   });
 
   it("does not echo the query when a name lookup finds nothing", async () => {

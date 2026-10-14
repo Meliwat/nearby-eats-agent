@@ -14,6 +14,7 @@ import {
   toClockTime,
 } from "@/lib/restaurants/hours";
 import { searchRestaurants, type SearchFilters, type SearchResult } from "@/lib/restaurants/search";
+import { carryForward, DROPPABLE_CONSTRAINTS, type AppliedConstraints } from "./constraints";
 import { FACT_KEY_NAMES, FACT_KEYS, MAX_FACT_VALUE_LENGTH, rememberFact, type FactChange } from "./facts";
 import { createPoll, getPollView } from "./polls";
 
@@ -36,6 +37,8 @@ export interface ToolContext {
    * in its replies, so durable (user-scope) facts are refused for the rest of the conversation.
    */
   conversationReadThirdPartyText: boolean;
+  /** Hard constraints the conversation's searches have applied so far; later searches keep them (see constraints.ts). */
+  constraints: AppliedConstraints;
   /** The most recent search this turn; recommend_restaurant must pick one of its candidates. */
   lastSearch: (SearchResult & { arrival: SearchFilters["arrival"] }) | null;
 }
@@ -79,6 +82,11 @@ function buildInputSchemas(cities: string[]) {
         .describe("1=$ (under $15/person), 2=$$ ($15-30), 3=$$$ ($30-60), 4=$$$$ ($60+)"),
       cities: z.array(z.enum(cities as [string, ...string[]])).describe("Limit to these cities. Empty for anywhere."),
       avoid_cash_only: z.boolean().describe("True if they can't pay cash"),
+      drop_constraints: z
+        .array(z.enum(DROPPABLE_CONSTRAINTS))
+        .describe(
+          "Constraints from earlier searches carry over automatically. List any the user has explicitly changed, e.g. kids when the kids aren't coming after all. Usually empty.",
+        ),
     }),
     get_restaurant: z.strictObject({
       name: z
@@ -224,23 +232,28 @@ function runSearch(input: ToolInput<"search_restaurants">, ctx: ToolContext): To
 
   const { day, minute, rolledToTomorrow, ...resolved } = resolveArrival(ctx.now, RESTAURANT_TIME_ZONE, daysFromToday, input.time);
   const arrival = { day, minute, daysFromToday: resolved.daysFromToday };
+  const { applied, carried } = carryForward(ctx.constraints, input, input.drop_constraints);
   const result = searchRestaurants(ctx.catalog, {
     arrival,
-    diets: input.diets,
-    withKids: input.with_kids,
-    partySize: input.party_size,
-    maxPriceTier: input.max_price_tier,
+    diets: applied.diets,
+    withKids: applied.with_kids,
+    partySize: applied.party_size,
+    maxPriceTier: applied.max_price_tier,
     cities: input.cities,
-    avoidCashOnly: input.avoid_cash_only,
+    avoidCashOnly: applied.avoid_cash_only,
     excludeIds: [...ctx.rejectedIds],
   });
   ctx.lastSearch = { ...result, arrival };
+  ctx.constraints = applied;
 
   return {
     isError: false,
     factChanges: [],
     output: {
       arrival: `${DAY_NAMES[day]} ${formatMinute(minute)}`,
+      applied_constraints: applied,
+      ...(carried.length > 0 && { carried_over: carried }),
+      ...(input.drop_constraints.length > 0 && { dropped: input.drop_constraints }),
       ...(rolledToTomorrow && { note: "That time already passed today, so this searched tomorrow. Tell the user." }),
       candidate_count: result.candidates.length,
       candidates: result.candidates.map(describeForModel),

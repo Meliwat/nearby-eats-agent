@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db/client";
 import { agentEvents, messages } from "@/db/schema";
 import { loadCatalog } from "@/lib/restaurants/load-catalog";
-import { buildContextMessage, loadRecommendations, loadTranscript, SYSTEM_PROMPT } from "./context";
+import { buildContextMessage, loadCarriedConstraints, loadRecommendations, loadTranscript, SYSTEM_PROMPT } from "./context";
 import { agentEventSchema, type AgentEvent, type StreamMessage } from "./events";
 import { loadActiveFacts } from "./facts";
 import { conversationReadPollResults, summarizePolls } from "./polls";
@@ -61,13 +61,14 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
   let replyStored = false;
   try {
     const now = new Date();
-    const [catalog, transcript, facts, recs, polls, readPollNotesEarlier] = await Promise.all([
+    const [catalog, transcript, facts, recs, polls, readPollNotesEarlier, carriedConstraints] = await Promise.all([
       loadCatalog(),
       loadTranscript(conversationId),
       loadActiveFacts(userId, conversationId),
       loadRecommendations(conversationId),
       summarizePolls(conversationId),
       conversationReadPollResults(conversationId),
+      loadCarriedConstraints(conversationId),
     ]);
     const { definitions, schemas } = buildTools(catalog);
     const ctx: ToolContext = {
@@ -79,6 +80,7 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
       rejectedIds: new Set(recs.filter((r) => r.status === "rejected").map((r) => r.restaurantId)),
       readThirdPartyText: false,
       conversationReadThirdPartyText: readPollNotesEarlier,
+      constraints: carriedConstraints,
       lastSearch: null,
     };
 
