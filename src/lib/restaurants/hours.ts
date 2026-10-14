@@ -12,6 +12,8 @@ export interface OpenInterval {
 }
 
 export const MINUTES_PER_DAY = 24 * 60;
+/** Every restaurant in the catalog is in Orange County. */
+export const RESTAURANT_TIME_ZONE = "America/Los_Angeles";
 export const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const ALL_DAYS: DayOfWeek[] = [0, 1, 2, 3, 4, 5, 6];
 
@@ -79,6 +81,28 @@ export function isOpenThrough(
   const end = minute + durationMinutes - 1;
   const endDay = (end >= MINUTES_PER_DAY ? (day + 1) % 7 : day) as DayOfWeek;
   return isOpenAt(intervals, day, minute) && isOpenAt(intervals, endDay, end % MINUTES_PER_DAY);
+}
+
+/**
+ * Closing time of the open period covering `minute` on `day`, measured on that day's clock
+ * (so a Friday-night period ending 1am, seen from Saturday 12:30am, closes at minute 60).
+ */
+export function closingMinuteAt(intervals: OpenInterval[], day: DayOfWeek, minute: number): number | null {
+  const previousDay = ((day + 6) % 7) as DayOfWeek;
+  for (const interval of intervals) {
+    if (interval.day === day && minute >= interval.openMinute && minute < interval.closeMinute) return interval.closeMinute;
+    if (interval.day === previousDay && minute + MINUTES_PER_DAY < interval.closeMinute) {
+      return interval.closeMinute - MINUTES_PER_DAY;
+    }
+  }
+  return null;
+}
+
+/** Calendar date ("2026-10-16") that is `daysAhead` days after `date`, in the given time zone. */
+export function localDateAfter(date: Date, daysAhead: number, timeZone: string): string {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+  const [year, month, day] = today.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + daysAhead)).toISOString().slice(0, 10);
 }
 
 /** Day of week and minute of day for `date` in the given IANA time zone. */

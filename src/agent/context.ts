@@ -5,7 +5,7 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { messages, recommendations, restaurants } from "@/db/schema";
 import type { ActiveFact } from "./facts";
-import { TIME_ZONE } from "./tools";
+import { RESTAURANT_TIME_ZONE as TIME_ZONE } from "@/lib/restaurants/hours";
 
 /** Read once per server instance. next.config.ts includes prompts/ in the deployed function. */
 export const SYSTEM_PROMPT = readFileSync(path.join(process.cwd(), "prompts/system-prompt.md"), "utf8");

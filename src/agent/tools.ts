@@ -4,12 +4,17 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { groupPolls, recommendations } from "@/db/schema";
 import type { CatalogRestaurant } from "@/lib/restaurants/catalog";
-import { DAY_NAMES, toLocalDayMinute, type DayOfWeek } from "@/lib/restaurants/hours";
-import { formatMinute, searchRestaurants, type SearchResult } from "@/lib/restaurants/search";
+import {
+  closingMinuteAt,
+  DAY_NAMES,
+  localDateAfter,
+  RESTAURANT_TIME_ZONE as TIME_ZONE,
+  toLocalDayMinute,
+  type DayOfWeek,
+} from "@/lib/restaurants/hours";
+import { formatMinute, searchRestaurants, type SearchFilters, type SearchResult } from "@/lib/restaurants/search";
 import { FACT_KEY_NAMES, FACT_KEYS, rememberFact, type FactChange } from "./facts";
 import { createPoll, getPollView } from "./polls";
-
-export const TIME_ZONE = "America/Los_Angeles";
 
 /** Per-turn state the tools read and update. */
 export interface ToolContext {
@@ -21,7 +26,7 @@ export interface ToolContext {
   /** Restaurants the user turned down in this conversation; search never returns them. */
   rejectedIds: Set<number>;
   /** The most recent search this turn; recommend_restaurant must pick one of its candidates. */
-  lastSearch: SearchResult | null;
+  lastSearch: (SearchResult & { arrival: SearchFilters["arrival"] }) | null;
 }
 
 export interface ToolOutcome {
@@ -197,8 +202,9 @@ function runSearch(input: z.infer<ToolSchemas["search_restaurants"]>, ctx: ToolC
   const day = ((local.day + daysFromToday) % 7) as DayOfWeek;
   const minute = input.time === null ? local.minute : clockToMinute(input.time);
 
+  const arrival = { day, minute, daysFromToday };
   const result = searchRestaurants(ctx.catalog, {
-    arrival: { day, minute, daysFromToday },
+    arrival,
     diets: input.diets,
     withKids: input.with_kids,
     partySize: input.party_size,
@@ -207,7 +213,7 @@ function runSearch(input: z.infer<ToolSchemas["search_restaurants"]>, ctx: ToolC
     avoidCashOnly: input.avoid_cash_only,
     excludeIds: [...ctx.rejectedIds],
   });
-  ctx.lastSearch = result;
+  ctx.lastSearch = { ...result, arrival };
 
   return {
     isError: false,
@@ -243,10 +249,24 @@ async function runRecommend(input: z.infer<ToolSchemas["recommend_restaurant"]>,
     restaurantId: candidate.id,
     reason: input.reason,
   });
+  // The visit the search was checked against, so the UI can offer directions, a calendar event, and a closing time.
+  const { day, minute, daysFromToday } = ctx.lastSearch.arrival;
+  const closeMinute = closingMinuteAt(candidate.hours, day, minute);
   return {
     isError: false,
     factChanges: [],
-    output: { recommended: candidate.name, address: candidate.address, hours: candidate.hoursText, reason: input.reason },
+    output: {
+      recommended: candidate.name,
+      address: candidate.address,
+      hours: candidate.hoursText,
+      reason: input.reason,
+      visit: {
+        date: localDateAfter(ctx.now, daysFromToday, TIME_ZONE),
+        time: `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`,
+        open_until: closeMinute === null ? null : formatMinute(closeMinute),
+        close_minute: closeMinute,
+      },
+    },
   };
 }
 

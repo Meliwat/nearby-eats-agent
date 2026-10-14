@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isOpenAt, parseHours, toLocalDayMinute } from "./hours";
+import { closingMinuteAt, isOpenAt, localDateAfter, parseHours, toLocalDayMinute } from "./hours";
 
 const SUN = 0, MON = 1, TUE = 2, WED = 3, FRI = 5, SAT = 6;
 const at = (hour: number, minute = 0) => hour * 60 + minute;
@@ -68,5 +68,31 @@ describe("toLocalDayMinute", () => {
     // 2026-10-17 03:30 UTC is Friday 2026-10-16 8:30pm in Los Angeles (PDT).
     const local = toLocalDayMinute(new Date("2026-10-17T03:30:00Z"), "America/Los_Angeles");
     expect(local).toEqual({ day: FRI, minute: at(20, 30) });
+  });
+});
+
+describe("closingMinuteAt", () => {
+  const intervals = parseHours("Daily 9am–11pm, Fri–Sat until 1am");
+
+  it("returns the closing time of the period you arrive in", () => {
+    expect(closingMinuteAt(intervals, MON, at(19))).toBe(at(23));
+  });
+
+  it("measures a past-midnight close on the arrival day's clock", () => {
+    expect(closingMinuteAt(intervals, FRI, at(23, 30))).toBe(at(25));
+    expect(closingMinuteAt(intervals, SAT, at(0, 30))).toBe(at(1));
+  });
+
+  it("returns null when closed", () => {
+    expect(closingMinuteAt(intervals, MON, at(23, 30))).toBeNull();
+  });
+});
+
+describe("localDateAfter", () => {
+  it("uses the Los Angeles date, not UTC, and rolls over months", () => {
+    // 03:30 UTC on Oct 31 is still Oct 30 in Los Angeles.
+    const lateEvening = new Date("2026-10-31T03:30:00Z");
+    expect(localDateAfter(lateEvening, 0, "America/Los_Angeles")).toBe("2026-10-30");
+    expect(localDateAfter(lateEvening, 2, "America/Los_Angeles")).toBe("2026-11-01");
   });
 });
