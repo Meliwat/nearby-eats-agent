@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { catalogFromSource } from "./catalog";
-import { isOpenAt, type DayOfWeek } from "./hours";
+import type { DayOfWeek, OpenInterval } from "./hours";
 import { parseRestaurantFile } from "./parse-source";
 import { MIN_VISIT_MINUTES, searchRestaurants, type SearchFilters } from "./search";
 
@@ -38,7 +38,8 @@ describe("searchRestaurants", () => {
   });
 
   it("only returns places open for every minute of the visit, for every arrival hour of the week", () => {
-    // Checked minute by minute with isOpenAt, independently of the isOpenThrough logic search uses.
+    // Checked minute by minute with a reference implementation local to this test, so a bug in the
+    // shared hours helpers (isOpenThrough, isOpenAt, closingMinuteAt) can't make both sides agree.
     for (let day = 0; day < 7; day++) {
       for (let hour = 0; hour < 24; hour++) {
         const arrival = { day: day as DayOfWeek, minute: at(hour), daysFromToday: 0 };
@@ -46,7 +47,9 @@ describe("searchRestaurants", () => {
           for (let offset = 0; offset < MIN_VISIT_MINUTES; offset++) {
             const minute = arrival.minute + offset;
             const visitDay = (minute >= 24 * 60 ? (day + 1) % 7 : day) as DayOfWeek;
-            expect(isOpenAt(r.hours, visitDay, minute % (24 * 60)), `${r.name} day ${day} ${hour}:00 +${offset}m`).toBe(true);
+            expect(referenceIsOpen(r.hours, visitDay, minute % (24 * 60)), `${r.name} day ${day} ${hour}:00 +${offset}m`).toBe(
+              true,
+            );
           }
         }
       }
@@ -107,3 +110,12 @@ describe("searchRestaurants", () => {
     expect(result.excluded.find((e) => e.id === 21)?.reasons.map((r) => r.code)).toContain("already_rejected");
   });
 });
+
+/** Is any open period covering this minute, on this day or spilling over from the day before? */
+function referenceIsOpen(intervals: OpenInterval[], day: DayOfWeek, minute: number): boolean {
+  const yesterday = (day + 6) % 7;
+  return intervals.some(
+    ({ day: d, openMinute, closeMinute }) =>
+      (d === day && openMinute <= minute && minute < closeMinute) || (d === yesterday && minute + 24 * 60 < closeMinute),
+  );
+}
