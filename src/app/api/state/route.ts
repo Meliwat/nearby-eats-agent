@@ -2,19 +2,11 @@ import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { agentEvents, messages } from "@/db/schema";
-import { agentEventSchema, type StoredAgentEvent } from "@/agent/events";
+import { agentEventSchema, type ConversationState, type StoredAgentEvent } from "@/agent/events";
 import { loadActiveFacts } from "@/agent/facts";
 import { clientIp, LIMITS, tooManyRequests } from "@/lib/rate-limit";
 import { consumeLimits } from "@/lib/rate-limit-store";
 import { getUserId, ownsConversation } from "@/lib/session";
-
-export interface ConversationState {
-  conversationId: string | null;
-  messages: { id: string; role: "user" | "assistant"; content: string }[];
-  /** Agent events grouped by the user message whose turn produced them. */
-  eventsByTurn: Record<string, StoredAgentEvent[]>;
-  facts: Awaited<ReturnType<typeof loadActiveFacts>>;
-}
 
 /**
  * Everything the page needs to render a conversation after a reload: transcript, the full

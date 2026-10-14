@@ -31,7 +31,8 @@ export const factChangePayload = z.object({
 });
 
 export const errorPayload = z.object({
-  stage: z.string(),
+  /** "loop": a recoverable problem inside a turn (it still replies). "turn": the turn failed. */
+  stage: z.enum(["loop", "turn"]),
   message: z.string(),
 });
 
@@ -45,6 +46,22 @@ export const agentEventSchema = z.discriminatedUnion("type", [
 export type AgentEvent = z.infer<typeof agentEventSchema>;
 export type StoredAgentEvent = AgentEvent & { id: number; createdAt: string };
 
+/** A fact as the inspector shows it. */
+export interface FactView {
+  key: string;
+  value: string;
+  scope: "user" | "conversation";
+}
+
+/** What GET /api/state returns: everything the page needs to render a conversation after a reload. */
+export interface ConversationState {
+  conversationId: string | null;
+  messages: { id: string; role: "user" | "assistant"; content: string }[];
+  /** Agent events grouped by the user message whose turn produced them. */
+  eventsByTurn: Record<string, StoredAgentEvent[]>;
+  facts: FactView[];
+}
+
 /** One line of the NDJSON stream the chat endpoint sends to the browser. */
 export type StreamMessage =
   | { kind: "turn_started"; conversationId: string; userMessageId: string }
@@ -52,6 +69,6 @@ export type StreamMessage =
   /** A tool began running. UI-only (drives the activity indicator); the finished call is logged as an event. */
   | { kind: "tool_started"; name: string }
   | { kind: "text"; delta: string }
-  | { kind: "context"; facts: { key: string; value: string; scope: "user" | "conversation" }[] }
+  | { kind: "context"; facts: FactView[] }
   | { kind: "done"; assistantMessageId: string; text: string }
   | { kind: "error"; message: string };

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { StoredAgentEvent, StreamMessage } from "@/agent/events";
-import type { ConversationState } from "@/app/api/state/route";
+import type { ConversationState } from "@/agent/events";
 import type { Activity } from "./activity-indicator";
 import { ChatThread } from "./chat-thread";
 import { Inspector } from "./inspector";
