@@ -287,7 +287,7 @@ async function runRecommend(input: ToolInput<"recommend_restaurant">, ctx: ToolC
       reason: input.reason,
       visit: {
         date: localDateAfter(ctx.now, daysFromToday, TIME_ZONE),
-        time: `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`,
+        time: toClockTime(minute),
         open_until: closeMinute === null ? null : formatMinute(closeMinute),
         close_minute: closeMinute,
       },
@@ -313,10 +313,11 @@ async function runUpdateRecommendation(
 }
 
 async function runStartGroupPoll(input: ToolInput<"start_group_poll">, ctx: ToolContext): Promise<ToolOutcome> {
-  if (!ctx.lastSearch) return failure("Call search_restaurants first so every option fits the group.");
+  const search = ctx.lastSearch;
+  if (!search) return failure("Call search_restaurants first so every option fits the group.");
   const ids = input.options.map((option) => option.restaurant_id);
   if (new Set(ids).size !== ids.length) return failure("Each option must be a different restaurant.");
-  const candidates = ids.map((id) => ctx.lastSearch!.candidates.find((r) => r.id === id));
+  const candidates = ids.map((id) => search.candidates.find((r) => r.id === id));
   const missing = ids.filter((_, index) => !candidates[index]);
   if (missing.length > 0) return failure(`Not candidates in the latest search: ${missing.join(", ")}`);
 
@@ -363,6 +364,12 @@ function describeForModel(r: CatalogRestaurant) {
     cash_only: r.cashOnly,
     description: r.context,
   };
+}
+
+/** Minutes after midnight as 24-hour "HH:MM", the same format search_restaurants takes. */
+function toClockTime(minute: number): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(Math.floor(minute / 60))}:${pad(minute % 60)}`;
 }
 
 function failure(message: string): ToolOutcome {
