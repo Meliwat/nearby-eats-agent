@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { closingMinuteAt, isOpenAt, localDateAfter, parseHours, resolveArrival, toLocalDayMinute } from "./hours";
 
-const SUN = 0, MON = 1, TUE = 2, WED = 3, FRI = 5, SAT = 6;
+const SUN = 0, MON = 1, TUE = 2, WED = 3, THU = 4, FRI = 5, SAT = 6;
 const at = (hour: number, minute = 0) => hour * 60 + minute;
 
 describe("parseHours", () => {
@@ -19,7 +19,7 @@ describe("parseHours", () => {
 
   it("walks ranges that wrap past Saturday", () => {
     const intervals = parseHours("Wed–Mon 11am–9pm. Closed Tuesdays.");
-    expect(intervals.map((i) => i.day)).toEqual([WED, 4, FRI, SAT, SUN, MON]);
+    expect(intervals.map((i) => i.day)).toEqual([WED, THU, FRI, SAT, SUN, MON]);
   });
 
   it("keeps split shifts on the same days", () => {
@@ -108,7 +108,7 @@ describe("resolveArrival", () => {
 
   it("rolls a time that already passed today to tomorrow", () => {
     expect(resolveArrival(wednesdayNight, LA, 0, "00:30")).toEqual({
-      day: 4,
+      day: THU,
       minute: at(0, 30),
       daysFromToday: 1,
       rolledToTomorrow: true,
