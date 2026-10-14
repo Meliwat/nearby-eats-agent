@@ -22,6 +22,19 @@ describe("summarizeToolCall", () => {
     expect(summarizeToolCall(pick)).toBe("picked Tandoor & Co");
   });
 
+  it("summarizes every other tool in one line", () => {
+    const call = (name: string, output: unknown): ToolCallPayload => ({ toolUseId: "t", name, input: {}, output, isError: false });
+    expect(summarizeToolCall(call("remember_fact", { key: "diet", value: "vegan" }))).toBe("diet = vegan");
+    expect(summarizeToolCall(call("update_recommendation", { restaurant_id: 21, status: "rejected" }))).toBe(
+      "restaurant 21 rejected",
+    );
+    expect(summarizeToolCall(call("get_restaurant", [{}, {}]))).toBe("2 match(es)");
+    expect(summarizeToolCall(call("start_group_poll", { options: ["Casa Verde", "Mangal Grill"] }))).toBe(
+      "poll: Casa Verde / Mangal Grill",
+    );
+    expect(summarizeToolCall(call("get_poll_results", { options: [{ name: "Casa Verde", votes: 2 }] }))).toBe("Casa Verde 2");
+  });
+
   it("marks failed calls", () => {
     expect(summarizeToolCall({ ...pick, isError: true, output: { error: "not a candidate" } })).toBe("failed: not a candidate");
   });
