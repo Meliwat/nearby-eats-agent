@@ -10,6 +10,8 @@ export const modelCallPayload = z.object({
   inputTokens: z.number(),
   outputTokens: z.number(),
   cacheReadTokens: z.number(),
+  /** Input tokens written to the prompt cache this call. Defaults to 0 for events stored before it was recorded. */
+  cacheWriteTokens: z.number().default(0),
 });
 
 export const toolCallPayload = z.object({

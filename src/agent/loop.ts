@@ -110,6 +110,7 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
           inputTokens: message.usage.input_tokens,
           outputTokens: message.usage.output_tokens,
           cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
+          cacheWriteTokens: message.usage.cache_creation_input_tokens ?? 0,
         },
       });
 

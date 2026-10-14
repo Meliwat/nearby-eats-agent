@@ -57,7 +57,9 @@ export async function POST(request: Request) {
       let tokensUsed = 0;
       const emit = (message: StreamMessage) => {
         if (message.kind === "event" && message.event.type === "model_call") {
-          tokensUsed += message.event.payload.inputTokens + message.event.payload.outputTokens;
+          // Cache reads are billed at a fraction of normal input, so the budget counts what costs real money.
+          const { inputTokens, cacheWriteTokens, outputTokens } = message.event.payload;
+          tokensUsed += inputTokens + cacheWriteTokens + outputTokens;
         }
         if (clientGone) return;
         try {

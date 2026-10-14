@@ -68,9 +68,10 @@ function EventRow({ event }: { event: StoredAgentEvent }) {
   switch (event.type) {
     case "model_call": {
       const p = event.payload;
+      const totalInput = p.inputTokens + p.cacheReadTokens + p.cacheWriteTokens;
       return (
         <li className="font-mono text-[11px] text-stone-500">
-          model · {seconds(event.durationMs)} · {p.inputTokens + p.cacheReadTokens} in ({p.cacheReadTokens} cached) /{" "}
+          model · {seconds(event.durationMs)} · {totalInput} in ({p.cacheReadTokens} cached) /{" "}
           {p.outputTokens} out · {p.stopReason}
         </li>
       );
