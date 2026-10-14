@@ -10,7 +10,10 @@ export const FACT_KEYS = {
   name: { scope: "user", description: "What to call them" },
   diet: { scope: "user", description: "The texter's OWN dietary pattern, e.g. vegetarian, vegan, no restrictions" },
   allergies: { scope: "user", description: "The texter's OWN allergies or foods they must avoid" },
-  kids: { scope: "user", description: "Whether they usually bring kids, and ages if known" },
+  kids: {
+    scope: "user",
+    description: "A lasting pattern: whether they have kids who usually come along, e.g. 'has 2 young kids'. Who is coming this time goes in party_size or party_needs",
+  },
   home_area: { scope: "user", description: "Where they live or usually eat" },
   usual_budget: { scope: "user", description: "What they usually like to spend" },
   likes: { scope: "user", description: "Cuisines, dishes, or vibes they enjoy" },
