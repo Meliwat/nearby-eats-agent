@@ -1,5 +1,5 @@
 import type { CatalogRestaurant } from "./catalog";
-import { DAY_NAMES, isOpenAt, isOpenThrough, type DayOfWeek } from "./hours";
+import { DAY_NAMES, formatMinute, isOpenAt, isOpenThrough, type DayOfWeek } from "./hours";
 
 export type Diet = "vegetarian" | "vegan" | "gluten_free";
 
@@ -121,12 +121,4 @@ export function exclusionReasons(restaurant: CatalogRestaurant, filters: SearchF
 function isAdultsOnlyAt(adultsOnlyFromMinute: number | null, minute: number): boolean {
   if (adultsOnlyFromMinute === null) return false;
   return minute >= adultsOnlyFromMinute || minute < LATE_NIGHT_ENDS_MINUTE;
-}
-
-/** 1290 -> "9:30pm" */
-export function formatMinute(minute: number): string {
-  const hour24 = Math.floor(minute / 60) % 24;
-  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
-  const minutes = minute % 60;
-  return `${hour12}${minutes ? `:${String(minutes).padStart(2, "0")}` : ""}${hour24 < 12 ? "am" : "pm"}`;
 }

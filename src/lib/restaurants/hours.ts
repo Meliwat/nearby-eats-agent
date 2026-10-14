@@ -128,6 +128,20 @@ export function clockToMinute(time: string): number {
   return hours * 60 + minutes;
 }
 
+/** 1170 -> "19:30" (the inverse of clockToMinute) */
+export function toClockTime(minute: number): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(Math.floor(minute / 60))}:${pad(minute % 60)}`;
+}
+
+/** 1290 -> "9:30pm" */
+export function formatMinute(minute: number): string {
+  const hour24 = Math.floor(minute / 60) % 24;
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  const minutes = minute % 60;
+  return `${hour12}${minutes ? `:${String(minutes).padStart(2, "0")}` : ""}${hour24 < 12 ? "am" : "pm"}`;
+}
+
 /** Day of week and minute of day for `date` in the given IANA time zone. */
 export function toLocalDayMinute(date: Date, timeZone: string): { day: DayOfWeek; minute: number } {
   const parts = new Intl.DateTimeFormat("en-US", {

@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { closingMinuteAt, isOpenAt, isOpenThrough, localDateAfter, parseHours, resolveArrival, toLocalDayMinute } from "./hours";
+import {
+  closingMinuteAt,
+  clockToMinute,
+  formatMinute,
+  isOpenAt,
+  isOpenThrough,
+  localDateAfter,
+  parseHours,
+  resolveArrival,
+  toClockTime,
+  toLocalDayMinute,
+} from "./hours";
 
 const SUN = 0, MON = 1, TUE = 2, WED = 3, THU = 4, FRI = 5, SAT = 6;
 const at = (hour: number, minute = 0) => hour * 60 + minute;
@@ -136,5 +147,19 @@ describe("isOpenThrough", () => {
     const lateNight = parseHours("Daily 9am–11pm, Fri–Sat until 1am");
     expect(isOpenThrough(lateNight, FRI, at(23, 30), 45)).toBe(true);
     expect(isOpenThrough(lateNight, MON, at(22, 30), 45)).toBe(false);
+  });
+});
+
+describe("formatMinute", () => {
+  it("formats minutes of the day as clock times", () => {
+    expect([0, at(9), at(12), at(21, 30), at(24, 30)].map(formatMinute)).toEqual(["12am", "9am", "12pm", "9:30pm", "12:30am"]);
+  });
+});
+
+describe("clock times", () => {
+  it("converts between HH:MM and minutes both ways", () => {
+    expect(clockToMinute("19:30")).toBe(at(19, 30));
+    expect(toClockTime(at(7, 5))).toBe("07:05");
+    expect(toClockTime(clockToMinute("23:59"))).toBe("23:59");
   });
 });

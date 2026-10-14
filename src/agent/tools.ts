@@ -9,9 +9,11 @@ import {
   DAY_NAMES,
   localDateAfter,
   resolveArrival,
-  RESTAURANT_TIME_ZONE as TIME_ZONE,
+  formatMinute,
+  RESTAURANT_TIME_ZONE,
+  toClockTime,
 } from "@/lib/restaurants/hours";
-import { formatMinute, searchRestaurants, type SearchFilters, type SearchResult } from "@/lib/restaurants/search";
+import { searchRestaurants, type SearchFilters, type SearchResult } from "@/lib/restaurants/search";
 import { FACT_KEY_NAMES, FACT_KEYS, MAX_FACT_VALUE_LENGTH, rememberFact, type FactChange } from "./facts";
 import { createPoll, getPollView } from "./polls";
 
@@ -220,7 +222,7 @@ function runSearch(input: ToolInput<"search_restaurants">, ctx: ToolContext): To
   const daysFromToday = input.days_from_today ?? 0;
   if (daysFromToday > 0 && input.time === null) return failure("time is required when searching a future day");
 
-  const { day, minute, rolledToTomorrow, ...resolved } = resolveArrival(ctx.now, TIME_ZONE, daysFromToday, input.time);
+  const { day, minute, rolledToTomorrow, ...resolved } = resolveArrival(ctx.now, RESTAURANT_TIME_ZONE, daysFromToday, input.time);
   const arrival = { day, minute, daysFromToday: resolved.daysFromToday };
   const result = searchRestaurants(ctx.catalog, {
     arrival,
@@ -302,7 +304,7 @@ async function runRecommend(input: ToolInput<"recommend_restaurant">, ctx: ToolC
       hours: candidate.hoursText,
       reason: input.reason,
       visit: {
-        date: localDateAfter(ctx.now, daysFromToday, TIME_ZONE),
+        date: localDateAfter(ctx.now, daysFromToday, RESTAURANT_TIME_ZONE),
         time: toClockTime(minute),
         open_until: closeMinute === null ? null : formatMinute(closeMinute),
         close_minute: closeMinute,
@@ -396,10 +398,6 @@ function describeForModel(r: CatalogRestaurant) {
 }
 
 /** Minutes after midnight as 24-hour "HH:MM", the same format search_restaurants takes. */
-function toClockTime(minute: number): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(Math.floor(minute / 60))}:${pad(minute % 60)}`;
-}
 
 function failure(message: string): ToolOutcome {
   return { output: { error: message }, isError: true, factChanges: [] };

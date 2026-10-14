@@ -7,7 +7,7 @@ import { agentEvents, messages, recommendations, restaurants } from "@/db/schema
 import type { ActiveFact } from "./facts";
 import type { ToolCallPayload } from "./tool-summary";
 import { trimTranscript, withActionNotes } from "./transcript";
-import { RESTAURANT_TIME_ZONE as TIME_ZONE } from "@/lib/restaurants/hours";
+import { RESTAURANT_TIME_ZONE } from "@/lib/restaurants/hours";
 
 /** Read once per server instance. next.config.ts includes prompts/ in the deployed function. */
 export const SYSTEM_PROMPT = readFileSync(path.join(process.cwd(), "prompts/system-prompt.md"), "utf8");
@@ -71,7 +71,7 @@ export function buildContextMessage(
   polls: string[],
 ): string {
   const localTime = now.toLocaleString("en-US", {
-    timeZone: TIME_ZONE,
+    timeZone: RESTAURANT_TIME_ZONE,
     weekday: "long",
     month: "long",
     day: "numeric",

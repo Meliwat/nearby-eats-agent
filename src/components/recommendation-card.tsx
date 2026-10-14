@@ -2,8 +2,7 @@
 
 import type { StoredAgentEvent } from "@/agent/events";
 import { buildVisitIcs } from "@/lib/calendar";
-import { localDateAfter, RESTAURANT_TIME_ZONE, toLocalDayMinute } from "@/lib/restaurants/hours";
-import { formatMinute } from "@/lib/restaurants/search";
+import { clockToMinute, formatMinute, localDateAfter, RESTAURANT_TIME_ZONE, toLocalDayMinute } from "@/lib/restaurants/hours";
 
 interface Recommendation {
   recommended: string;
@@ -90,7 +89,7 @@ function formatVisit(visit: Visit): string {
     day: "numeric",
     timeZone: "UTC",
   });
-  return `${date} at ${formatMinute(visitMinute(visit))}`;
+  return `${date} at ${formatMinute(clockToMinute(visit.time))}`;
 }
 
 /** "closes in 1h 20m" once the visit time has arrived today in Orange County; nothing for later visits. */
@@ -98,17 +97,12 @@ function closesIn(visit: Visit): string | null {
   const now = new Date();
   if (visit.close_minute === null || localDateAfter(now, 0, RESTAURANT_TIME_ZONE) !== visit.date) return null;
   const nowMinute = toLocalDayMinute(now, RESTAURANT_TIME_ZONE).minute;
-  if (nowMinute < visitMinute(visit)) return null;
+  if (nowMinute < clockToMinute(visit.time)) return null;
   const left = visit.close_minute - nowMinute;
   if (left <= 0) return "closed now";
   return `closes in ${left >= 60 ? `${Math.floor(left / 60)}h ` : ""}${left % 60}m`;
 }
 
-/** The visit's "HH:MM" as minutes after midnight. */
-function visitMinute(visit: Visit): number {
-  const [hours, minutes] = visit.time.split(":").map(Number);
-  return hours * 60 + minutes;
-}
 
 /** The latest successful recommend_restaurant call in a turn, if the agent made one. */
 export function recommendationFor(events: StoredAgentEvent[]): Recommendation | null {

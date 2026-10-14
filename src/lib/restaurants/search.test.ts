@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { catalogFromSource } from "./catalog";
 import { isOpenAt, type DayOfWeek } from "./hours";
 import { parseRestaurantFile } from "./parse-source";
-import { formatMinute, MIN_VISIT_MINUTES, searchRestaurants, type SearchFilters } from "./search";
+import { MIN_VISIT_MINUTES, searchRestaurants, type SearchFilters } from "./search";
 
 const catalog = catalogFromSource(
   parseRestaurantFile(readFileSync(new URL("../../../data/restaurants.txt", import.meta.url), "utf8")),
@@ -105,11 +105,5 @@ describe("searchRestaurants", () => {
       expect(r.cashOnly).toBe(false);
     }
     expect(result.excluded.find((e) => e.id === 21)?.reasons.map((r) => r.code)).toContain("already_rejected");
-  });
-});
-
-describe("formatMinute", () => {
-  it("formats minutes of the day as clock times", () => {
-    expect([0, at(9), at(12), at(21, 30), at(24, 30)].map(formatMinute)).toEqual(["12am", "9am", "12pm", "9:30pm", "12:30am"]);
   });
 });
