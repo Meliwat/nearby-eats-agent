@@ -68,7 +68,6 @@ export type StreamMessage =
   | { kind: "event"; event: StoredAgentEvent }
   /** A tool began running. UI-only (drives the activity indicator); the finished call is logged as an event. */
   | { kind: "tool_started"; name: string }
-  | { kind: "text"; delta: string }
   | { kind: "context"; facts: FactView[] }
   | { kind: "done"; assistantMessageId: string; text: string }
   | { kind: "error"; message: string };

@@ -153,7 +153,6 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
     // The reply is saved; failing to refresh the facts panel must not turn that into an error.
     const factsAfterTurn = await loadActiveFacts(userId, conversationId).catch(() => null);
     if (factsAfterTurn) emit({ kind: "context", facts: factsAfterTurn });
-    emit({ kind: "text", delta: reply });
     emit({ kind: "done", assistantMessageId: assistantMessage.id, text: reply });
   } catch (error) {
     // Full details go to server logs only; the stored event (which the inspector shows) says what kind of failure it was.

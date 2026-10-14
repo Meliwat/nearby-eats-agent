@@ -19,7 +19,7 @@ export function ChatApp() {
   const [facts, setFacts] = useState<Fact[]>([]);
   /** Fact keys changed during the latest turn, highlighted in the inspector. */
   const [changedKeys, setChangedKeys] = useState<string[]>([]);
-  /** The reply as streamed so far; the thread reveals it with a typewriter. */
+  /** The finished reply's text while the thread types it out. */
   const [draft, setDraft] = useState<string | null>(null);
   /** The finished reply, committed to the transcript once the typewriter has revealed all of it. */
   const [finishedReply, setFinishedReply] = useState<ChatMessage | null>(null);
@@ -68,10 +68,6 @@ export function ChatApp() {
       }
       case "tool_started":
         setActivity({ kind: "tool", name: message.name });
-        break;
-      case "text":
-        setActivity(null);
-        setDraft((current) => (current ?? "") + message.delta);
         break;
       case "context":
         setFacts(message.facts);
