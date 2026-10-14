@@ -66,16 +66,18 @@ export function isOpenAt(intervals: OpenInterval[], day: DayOfWeek, minute: numb
   return closingMinuteAt(intervals, day, minute) !== null;
 }
 
-/** True if open at `minute` and still open `durationMinutes` later (rolling into the next day if needed). */
+/**
+ * True if the open period you arrive in lasts at least `durationMinutes`. Checking the period's
+ * closing time (not just two sample moments) means a short break between lunch and dinner counts.
+ */
 export function isOpenThrough(
   intervals: OpenInterval[],
   day: DayOfWeek,
   minute: number,
   durationMinutes: number,
 ): boolean {
-  const end = minute + durationMinutes - 1;
-  const endDay = (end >= MINUTES_PER_DAY ? (day + 1) % 7 : day) as DayOfWeek;
-  return isOpenAt(intervals, day, minute) && isOpenAt(intervals, endDay, end % MINUTES_PER_DAY);
+  const closing = closingMinuteAt(intervals, day, minute);
+  return closing !== null && closing >= minute + durationMinutes;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closingMinuteAt, isOpenAt, localDateAfter, parseHours, resolveArrival, toLocalDayMinute } from "./hours";
+import { closingMinuteAt, isOpenAt, isOpenThrough, localDateAfter, parseHours, resolveArrival, toLocalDayMinute } from "./hours";
 
 const SUN = 0, MON = 1, TUE = 2, WED = 3, THU = 4, FRI = 5, SAT = 6;
 const at = (hour: number, minute = 0) => hour * 60 + minute;
@@ -121,5 +121,20 @@ describe("resolveArrival", () => {
 
   it("never rolls an explicit future day", () => {
     expect(resolveArrival(wednesdayNight, LA, 2, "08:00")).toMatchObject({ day: FRI, daysFromToday: 2, rolledToTomorrow: false });
+  });
+});
+
+describe("isOpenThrough", () => {
+  it("requires the period you arrive in to last, even if a later shift has started by then", () => {
+    // A 30-minute break: open at 1:50pm and again at 2:34pm, but closed in between.
+    const shortBreak = parseHours("Daily 11am–2pm, 2:30pm–10pm");
+    expect(isOpenThrough(shortBreak, MON, at(13, 50), 45)).toBe(false);
+    expect(isOpenThrough(shortBreak, MON, at(14, 30), 45)).toBe(true);
+  });
+
+  it("counts time past midnight", () => {
+    const lateNight = parseHours("Daily 9am–11pm, Fri–Sat until 1am");
+    expect(isOpenThrough(lateNight, FRI, at(23, 30), 45)).toBe(true);
+    expect(isOpenThrough(lateNight, MON, at(22, 30), 45)).toBe(false);
   });
 });
