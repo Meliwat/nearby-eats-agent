@@ -49,6 +49,9 @@ export async function POST(request: Request) {
 
   const encoder = new TextEncoder();
   const turn = { userId, conversationId, text: body.data.message };
+  // If the browser goes away mid-turn (tab closed, phone locked), the turn keeps running and saves
+  // its reply; only the sending stops. The user sees the reply when they come back.
+  let clientGone = false;
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let tokensUsed = 0;
@@ -56,7 +59,12 @@ export async function POST(request: Request) {
         if (message.kind === "event" && message.event.type === "model_call") {
           tokensUsed += message.event.payload.inputTokens + message.event.payload.outputTokens;
         }
-        controller.enqueue(encoder.encode(`${JSON.stringify(message)}\n`));
+        if (clientGone) return;
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(message)}\n`));
+        } catch {
+          clientGone = true;
+        }
       };
       try {
         await runTurn(turn, emit);
@@ -64,9 +72,14 @@ export async function POST(request: Request) {
         // runTurn already logged the error to agent_events and told the user; this is for server logs.
         console.error("chat turn failed", { conversationId: turn.conversationId, error });
       } finally {
-        await consumeLimits([{ limit: LIMITS.tokensGlobal, key: "all", amount: tokensUsed }]);
-        controller.close();
+        await consumeLimits([{ limit: LIMITS.tokensGlobal, key: "all", amount: tokensUsed }]).catch((error) =>
+          console.error("failed to record token usage", error),
+        );
+        if (!clientGone) controller.close();
       }
+    },
+    cancel() {
+      clientGone = true;
     },
   });
 

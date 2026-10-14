@@ -89,6 +89,14 @@ export function ChatApp() {
     }
   }, []);
 
+  /** Ends a turn that can't complete: show why, and take back the unsent message bubble. */
+  const failTurn = useCallback((message: string) => {
+    setMessages((current) => current.filter((m) => m.id !== PENDING_USER_ID));
+    setDraft(null);
+    setActivity(null);
+    setError(message);
+  }, []);
+
   const send = useCallback(
     async (text: string) => {
       setError(null);
@@ -102,25 +110,25 @@ export function ChatApp() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ conversationId, message: text }),
         });
-        if (response.status === 429) {
-          const { error } = (await response.json()) as { error: string };
-          setMessages((current) => current.filter((m) => m.id !== PENDING_USER_ID));
-          setDraft(null);
-          setActivity(null);
-          return setError(error);
+        if (!response.ok || !response.body) {
+          // The server explains rejections (rate limits, a missing conversation) in JSON.
+          const body = (await response.json().catch(() => null)) as { error?: string } | null;
+          return failTurn(body?.error ?? `Something went wrong (${response.status}). Try again?`);
         }
-        if (!response.ok || !response.body) throw new Error(`Request failed (${response.status})`);
         const turn = { id: PENDING_USER_ID };
+        let finished = false;
         for await (const line of readLines(response.body)) {
-          handleStreamMessage(JSON.parse(line) as StreamMessage, turn);
+          const message = JSON.parse(line) as StreamMessage;
+          if (message.kind === "done" || message.kind === "error") finished = true;
+          handleStreamMessage(message, turn);
         }
+        // The connection closed without a final message (e.g. the server timed out).
+        if (!finished) failTurn("The connection dropped before I finished. Try again?");
       } catch {
-        setError("Couldn't reach Nearby. Check your connection and try again.");
-        setDraft(null);
-        setActivity(null);
+        failTurn("Couldn't reach Nearby. Check your connection and try again.");
       }
     },
-    [conversationId, handleStreamMessage],
+    [conversationId, handleStreamMessage, failTurn],
   );
 
   const commitFinishedReply = useCallback(() => {
