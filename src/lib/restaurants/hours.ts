@@ -69,6 +69,18 @@ export function isOpenAt(intervals: OpenInterval[], day: DayOfWeek, minute: numb
   );
 }
 
+/** True if open at `minute` and still open `durationMinutes` later (rolling into the next day if needed). */
+export function isOpenThrough(
+  intervals: OpenInterval[],
+  day: DayOfWeek,
+  minute: number,
+  durationMinutes: number,
+): boolean {
+  const end = minute + durationMinutes - 1;
+  const endDay = (end >= MINUTES_PER_DAY ? (day + 1) % 7 : day) as DayOfWeek;
+  return isOpenAt(intervals, day, minute) && isOpenAt(intervals, endDay, end % MINUTES_PER_DAY);
+}
+
 /** Day of week and minute of day for `date` in the given IANA time zone. */
 export function toLocalDayMinute(date: Date, timeZone: string): { day: DayOfWeek; minute: number } {
   const parts = new Intl.DateTimeFormat("en-US", {
