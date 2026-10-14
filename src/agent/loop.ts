@@ -13,7 +13,13 @@ export const MODEL = "claude-sonnet-5-5";
 const EFFORT = "low";
 /** Upper bound on model calls per user message, so a confused loop can't run up cost. */
 const MAX_STEPS = 8;
-const MAX_TOKENS = 16_000;
+/** Thinking and the reply share this budget; a texting-length reply plus low-effort thinking fits easily. */
+const MAX_TOKENS = 4_000;
+/** The chat route's maxDuration is 60s; past this, the model is asked to wrap up without more tools. */
+const TURN_BUDGET_MS = 40_000;
+
+const FALLBACK_REPLY = "Sorry, I lost my train of thought there. What are you in the mood for?";
+const FAILURE_REPLY = "Sorry, something went wrong on my end. Try that again?";
 
 const client = new Anthropic();
 
@@ -45,6 +51,7 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
     emit({ kind: "event", event: { ...valid, id: stored.id, createdAt: stored.createdAt.toISOString() } });
   };
 
+  const turnStarted = Date.now();
   try {
     const now = new Date();
     const [catalog, transcript, facts, recs, polls] = await Promise.all([
@@ -74,12 +81,25 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
 
     let reply = "";
     for (let step = 1; step <= MAX_STEPS; step++) {
+      // On the last allowed step, or once the turn runs long, the model must answer in words.
+      // That way it reports what its tools already did instead of ending mid-task.
+      const mustAnswer = step === MAX_STEPS || Date.now() - turnStarted > TURN_BUDGET_MS;
+      if (mustAnswer && step > 1) {
+        await record({
+          type: "error",
+          durationMs: null,
+          payload: { stage: "loop", message: `Wrapping up at step ${step}: asked for a final answer without tools` },
+        });
+      }
       const started = Date.now();
       const stream = client.beta.messages.stream({
         model: MODEL,
         max_tokens: MAX_TOKENS,
         system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+        // Also cache the growing conversation, so each step in a turn re-reads earlier steps from cache.
+        cache_control: { type: "ephemeral" },
         tools: definitions,
+        tool_choice: mustAnswer ? { type: "none" } : { type: "auto" },
         messages: conversation,
         output_config: { effort: EFFORT },
         betas: ["server-side-fallback-2026-07-01"],
@@ -138,11 +158,12 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
       }
       // All results for one assistant message go back in a single user message.
       conversation.push({ role: "user", content: toolResults });
+    }
 
-      if (step === MAX_STEPS) {
-        await record({ type: "error", durationMs: null, payload: { stage: "loop", message: `Stopped after ${MAX_STEPS} steps` } });
-        reply ||= "Sorry, I got tangled up there. Can you tell me again what you're looking for?";
-      }
+    // An empty assistant message would make every later request in this conversation fail.
+    if (!reply.trim()) {
+      await record({ type: "error", durationMs: null, payload: { stage: "loop", message: "Model returned no text; sent a fallback reply" } });
+      reply = FALLBACK_REPLY;
     }
 
     const [assistantMessage] = await db
@@ -152,11 +173,23 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
     emit({ kind: "context", facts: await loadActiveFacts(userId, conversationId) });
     emit({ kind: "done", assistantMessageId: assistantMessage.id, text: reply });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await record({ type: "error", durationMs: null, payload: { stage: "turn", message } }).catch(() => {
+    // Full details go to server logs only; the stored event (which the inspector shows) says what kind of failure it was.
+    await record({ type: "error", durationMs: null, payload: { stage: "turn", message: describeError(error) } }).catch(() => {
       // The database itself may be what failed; the stream error below still reaches the user.
     });
-    emit({ kind: "error", message: "Something went wrong on my end. Try that again?" });
+    // Keep the transcript alternating user/assistant, so the next turn isn't answering two messages at once.
+    await db
+      .insert(messages)
+      .values({ conversationId, role: "assistant", content: FAILURE_REPLY })
+      .catch(() => {});
+    emit({ kind: "error", message: FAILURE_REPLY });
     throw error;
   }
+}
+
+/** A short, safe description of a failure: the kind of error, never raw messages that might include SQL or internals. */
+function describeError(error: unknown): string {
+  if (error instanceof Anthropic.APIError) return `Claude API error${error.status ? ` (HTTP ${error.status})` : ""}`;
+  if (error instanceof Error) return `${error.name} (details in server logs)`;
+  return "Unknown error (details in server logs)";
 }

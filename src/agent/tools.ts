@@ -172,8 +172,17 @@ export async function executeTool(
   if (!(name in schemas)) return failure(`Unknown tool "${name}". Available: ${Object.keys(schemas).join(", ")}`);
   const parsed = schemas[name as keyof ToolSchemas].safeParse(rawInput);
   if (!parsed.success) return failure(`Invalid input: ${z.prettifyError(parsed.error)}`);
-  const input = parsed.data;
+  try {
+    return await runTool(name, parsed.data, ctx);
+  } catch (error) {
+    // Infrastructure trouble inside one tool (e.g. a database hiccup) goes back to the model as a
+    // tool error it can work around, instead of failing the whole turn.
+    console.error("tool failed", { name, error });
+    return failure(`${name} failed on our side. Try once more, or continue without it.`);
+  }
+}
 
+async function runTool(name: string, input: unknown, ctx: ToolContext): Promise<ToolOutcome> {
   switch (name) {
     case "search_restaurants":
       return runSearch(input as z.infer<ToolSchemas["search_restaurants"]>, ctx);

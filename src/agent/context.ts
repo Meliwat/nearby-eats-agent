@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { messages, recommendations, restaurants } from "@/db/schema";
 import type { ActiveFact } from "./facts";
@@ -10,14 +10,20 @@ import { RESTAURANT_TIME_ZONE as TIME_ZONE } from "@/lib/restaurants/hours";
 /** Read once per server instance. next.config.ts includes prompts/ in the deployed function. */
 export const SYSTEM_PROMPT = readFileSync(path.join(process.cwd(), "prompts/system-prompt.md"), "utf8");
 
-/** The visible transcript so far, oldest first, as API messages. */
+/** How much of the chat the model re-reads each turn; older context lives on in remembered facts. */
+const MAX_TRANSCRIPT_MESSAGES = 30;
+
+/** The most recent visible transcript, oldest first, as API messages. Starts with a user message, skips empty rows. */
 export async function loadTranscript(conversationId: string): Promise<Anthropic.Beta.BetaMessageParam[]> {
   const rows = await db
     .select({ role: messages.role, content: messages.content })
     .from(messages)
     .where(eq(messages.conversationId, conversationId))
-    .orderBy(asc(messages.createdAt));
-  return rows.map((row) => ({ role: row.role, content: row.content }));
+    .orderBy(desc(messages.createdAt))
+    .limit(MAX_TRANSCRIPT_MESSAGES);
+  const recent = rows.reverse().filter((row) => row.content.trim());
+  const firstUser = recent.findIndex((row) => row.role === "user");
+  return recent.slice(Math.max(firstUser, 0)).map((row) => ({ role: row.role, content: row.content }));
 }
 
 export interface RecommendationSummary {
