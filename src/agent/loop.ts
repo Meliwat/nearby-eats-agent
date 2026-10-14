@@ -17,6 +17,11 @@ export const MAX_STEPS = 8;
 const MAX_TOKENS = 4_000;
 /** The chat route's maxDuration is 60s; past this, the model is asked to wrap up without more tools. */
 export const TURN_BUDGET_MS = 40_000;
+/**
+ * A model call still running at this point is aborted, so the turn fails through the normal error
+ * path (logged, placeholder reply saved) instead of being killed by the platform at 60s with nothing saved.
+ */
+const TURN_HARD_LIMIT_MS = 52_000;
 
 const FALLBACK_REPLY = "Sorry, I lost my train of thought there. What are you in the mood for?";
 const FAILURE_REPLY = "Sorry, something went wrong on my end. Try that again?";
@@ -53,6 +58,7 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
   };
 
   const turnStarted = Date.now();
+  let replyStored = false;
   try {
     const now = new Date();
     const [catalog, transcript, facts, recs, polls, readPollNotesEarlier] = await Promise.all([
@@ -97,7 +103,8 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
       const started = Date.now();
       // Text from separate model calls is separate thought; never glue it onto earlier text.
       let separatorPending = reply.length > 0;
-      const message = await callModel(conversation, definitions, mustAnswer, (delta) => {
+      const timeLeftMs = Math.max(turnStarted + TURN_HARD_LIMIT_MS - Date.now(), 1_000);
+      const message = await callModel(conversation, definitions, mustAnswer, timeLeftMs, (delta) => {
         if (separatorPending) emit({ kind: "text", delta: "\n\n" });
         separatorPending = false;
         emit({ kind: "text", delta });
@@ -117,7 +124,8 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
       });
 
       if (message.stop_reason === "refusal") {
-        reply = REFUSAL_REPLY;
+        // Keep what was already said: earlier steps' tool calls (a pick, a poll) stand and are shown.
+        reply = reply ? `${reply}\n\n${REFUSAL_REPLY}` : REFUSAL_REPLY;
         break;
       }
 
@@ -138,11 +146,14 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
       reply = FALLBACK_REPLY;
     }
 
-    const [[assistantMessage], factsAfterTurn] = await Promise.all([
-      db.insert(messages).values({ conversationId, role: "assistant", content: reply }).returning({ id: messages.id }),
-      loadActiveFacts(userId, conversationId),
-    ]);
-    emit({ kind: "context", facts: factsAfterTurn });
+    const [assistantMessage] = await db
+      .insert(messages)
+      .values({ conversationId, role: "assistant", content: reply })
+      .returning({ id: messages.id });
+    replyStored = true;
+    // The reply is saved; failing to refresh the facts panel must not turn that into an error.
+    const factsAfterTurn = await loadActiveFacts(userId, conversationId).catch(() => null);
+    if (factsAfterTurn) emit({ kind: "context", facts: factsAfterTurn });
     emit({ kind: "done", assistantMessageId: assistantMessage.id, text: reply });
   } catch (error) {
     // Full details go to server logs only; the stored event (which the inspector shows) says what kind of failure it was.
@@ -150,10 +161,12 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
       // The database itself may be what failed; the stream error below still reaches the user.
     });
     // Keep the transcript alternating user/assistant, so the next turn isn't answering two messages at once.
-    await db
-      .insert(messages)
-      .values({ conversationId, role: "assistant", content: FAILURE_REPLY })
-      .catch(() => {});
+    if (!replyStored) {
+      await db
+        .insert(messages)
+        .values({ conversationId, role: "assistant", content: FAILURE_REPLY })
+        .catch(() => {});
+    }
     emit({ kind: "error", message: FAILURE_REPLY });
     throw error;
   }
@@ -164,23 +177,27 @@ function callModel(
   conversation: Anthropic.Beta.BetaMessageParam[],
   tools: Anthropic.Beta.BetaTool[],
   mustAnswer: boolean,
+  timeLeftMs: number,
   onText: (delta: string) => void,
 ) {
-  const stream = client.beta.messages.stream({
-    model: MODEL,
-    max_tokens: MAX_TOKENS,
-    // Adaptive is this model's default; stated explicitly so the request shows what runs.
-    thinking: { type: "adaptive" },
-    system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-    // Also cache the growing conversation, so each step in a turn re-reads earlier steps from cache.
-    cache_control: { type: "ephemeral" },
-    tools,
-    tool_choice: mustAnswer ? { type: "none" } : { type: "auto" },
-    messages: conversation,
-    output_config: { effort: EFFORT },
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-  });
+  const stream = client.beta.messages.stream(
+    {
+      model: MODEL,
+      max_tokens: MAX_TOKENS,
+      // Adaptive is this model's default; stated explicitly so the request shows what runs.
+      thinking: { type: "adaptive" },
+      system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+      // Also cache the growing conversation, so each step in a turn re-reads earlier steps from cache.
+      cache_control: { type: "ephemeral" },
+      tools,
+      tool_choice: mustAnswer ? { type: "none" } : { type: "auto" },
+      messages: conversation,
+      output_config: { effort: EFFORT },
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+    },
+    { signal: AbortSignal.timeout(timeLeftMs) },
+  );
   stream.on("text", onText);
   return stream.finalMessage();
 }
@@ -219,6 +236,7 @@ async function runToolCalls(
 
 /** A short, safe description of a failure: the kind of error, never raw messages that might include SQL or internals. */
 function describeError(error: unknown): string {
+  if (error instanceof Anthropic.APIUserAbortError) return "Turn ran out of time (model call aborted)";
   if (error instanceof Anthropic.APIError) return `Claude API error${error.status ? ` (HTTP ${error.status})` : ""}`;
   if (error instanceof Error) return `${error.name} (details in server logs)`;
   return "Unknown error (details in server logs)";
