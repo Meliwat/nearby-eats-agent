@@ -21,24 +21,24 @@
 What the inspector showed, abbreviated:
 
 ```
-turn 1   search_restaurants     Wed 7pm: 38 fit, 12 ruled out
+turn 1   search_restaurants     Wed 7pm [no extra constraints]: 38 fit, 12 ruled out
          remember_fact          timing = tonight                   (this outing)
          → 38 places fit and the party would change the answer, so it asks before picking
 
 turn 2   remember_fact          party_size = 4 people              (this outing)
          remember_fact          party_needs = wife is vegetarian   (this outing)
          remember_fact          kids = 2 kids                      (remembered)
-         search_restaurants     [vegetarian; with kids; party of 4]: 28 fit, 22 ruled out
+         search_restaurants     Wed 6:30pm [vegetarian; with kids; party of 4]: 28 fit, 22 ruled out
          recommend_restaurant   picked Mangal Grill                (checked against that search)
 ```
 
-Every pick must come from a search the code ran that turn, and the reply is written only after that check passes. Every fact is stored with the message it came from. Every model call, tool call, and change to memory is logged and shown as it happens.
+Every recorded pick (the card under the reply) must come from a search the code ran that turn, and the reply is written after all of that turn's tool calls. Code doesn't check that the reply's wording names the same place; the prompt and the evals cover that. Every fact is stored with the message it came from. Every model call, tool call, and change to memory is logged and shown as it happens.
 
 ---
 
 ## Requirements
 
-**Recommendations.** When the agent recommends, it names one place and the reasons it fits *you*: the details you gave, matched against the restaurant's own description, plus one practical note (the wait, the parking, cash only, what to order). `recommend_restaurant` only accepts a candidate from the search the agent ran that turn, so a pick always satisfies every constraint that search applied: open long enough to eat, diets, kids and 21+ rules, party size, budget, area, and cash. Once a constraint has been searched with, later searches keep it until the agent explicitly drops it.
+**Recommendations.** When the agent recommends, it names one place and the reasons it fits *you*: the details you gave, matched against the restaurant's own description, plus one practical note (the wait, the parking, cash only, what to order). `recommend_restaurant` only accepts a candidate from the search the agent ran that turn, so a pick always satisfies every constraint that search applied: open long enough to eat, diets, kids and 21+ rules, party size, budget, area, and cash. Within a conversation, diets, kids, and no-cash carry forward to every later search until the agent drops them by name; party size and budget carry forward until dropped or replaced with a new value; area and time are set per search. Facts remembered from earlier conversations reach the model as context, not as search filters.
 
 **Conversation.** The prompt keeps replies to about sixty words and has the agent recommend early, asking a question only when the answer would change which restaurant wins. These are prompt rules, checked by the behavior evals rather than enforced in code. Otherwise it states its assumption out loud ("I'm assuming you'd eat around 6:30") and lets you correct it. Fragments, changes of mind, and answers to a different question are all simply new information.
 
@@ -66,14 +66,14 @@ The agent loop is written on the Anthropic SDK, with no agent framework. It is t
 
 | Tool | What the code guarantees |
 |---|---|
-| `search_restaurants` | Hard constraints, enforced by tested code: open long enough to actually eat, diets, kids and 21+ rules, party size, budget, area, cash, how far ahead it books. Constraints from earlier searches carry forward unless the agent drops them by name, which is logged. Returns the candidates, and why every other place was ruled out. |
+| `search_restaurants` | Hard constraints, enforced by tested code: open long enough to actually eat, diets, kids and 21+ rules, party size, budget, area, cash, how far ahead it books. Constraints from earlier searches in the conversation carry forward (see above); drops are logged and shown in the inspector. Returns the candidates, and why every other place was ruled out. |
 | `recommend_restaurant` | Accepts only a candidate from this turn's latest search. |
 | `remember_fact` | A fixed vocabulary of keys. The code sets each fact's scope and supersedes old values in one transaction. |
-| `update_recommendation` | Records a yes or a no. Once a recommended place is marked turned down, search excludes it for the rest of the conversation. |
+| `update_recommendation` | Records yes, no, or "bring it back". A recommended place marked turned down is excluded from later searches until the user asks for it again. |
 | `get_restaurant` | Looks up a place you name. |
 | `start_group_poll`, `get_poll_results` | The group pick, described below. Poll options must also come from the latest search. |
 
-When a tool call is wrong, the model gets the reason back as a tool error and corrects itself. Only infrastructure failures end a turn, and even then the turn is logged and a reply is saved.
+When a tool call is wrong, the model gets the reason back as a tool error and corrects itself. Only infrastructure failures (or a tool call cut off by the token limit) end a turn, and even then the turn is logged and a reply is saved.
 
 ---
 
@@ -97,13 +97,13 @@ When a tool call is wrong, the model gets the reason back as a tool error and co
 
 **Go now.** Every pick comes with the visit time, when the place closes ("closes in 1h 20m" if you're heading out now), directions, and a calendar event. It closes the distance between "sounds good" and actually going.
 
-**Activity indicator.** Instead of a spinner, a small steaming bowl and a line that follows what the agent is really doing: *Checking who's still open*, *Jotting that down*, *Counting the votes*, or, while it thinks, *Asking the locals*. Replies type themselves out as they arrive.
+**Activity indicator.** Instead of a spinner, a small steaming bowl and a line that follows what the agent is really doing: *Checking who's still open*, *Jotting that down*, *Counting the votes*, or, while it thinks, *Asking the locals*. Each reply is typed out on screen as it arrives.
 
 ---
 
 ## Reliability and security
 
-- **Rate limits:** per network, then per person, then daily caps on turns and tokens that bound the cost of a public link. A request blocked early never touches the shared budget.
+- **Rate limits:** per network, then per person, then daily caps on turns and tokens that bound the cost of a public link. A request blocked early never touches the shared budget. The token cap is checked before each turn and charged after it, so it can overshoot by about one turn's usage.
 - **Same-site only.** Chat and vote requests must be JSON from the app itself, so no other website can drive them, and no site can frame the pages.
 - **Failure handling.** A slow model call is aborted before the platform's time limit, so the failure is logged and a reply is still saved. Closing the tab doesn't interrupt a turn, a second tab is refused while a turn is running, and an empty reply is never stored.
 - **Anonymous users.** A random id in an httpOnly cookie, with ownership checked on every conversation read.
@@ -114,11 +114,11 @@ When a tool call is wrong, the model gets the reason back as a tool error and co
 
 | Layer | What it proves | When it runs |
 |---|---|---|
-| Unit | The hours parser, cross-checked against every restaurant's own "Closed" note. Search over all fifty places at every hour of the week, checked minute by minute. The hand-checked flags, the tool guards, constraint carry-over, transcript assembly, rate-limit math, calendar files. | Every push |
-| Database | Fact superseding and both uniqueness rules, ownership checks, and atomic rate-limit counters, against real Postgres. | Every relevant change, on a throwaway database branch |
-| Behavior | Seven tricky conversations replayed against the real model, judged mostly on what the agent *did* (tool inputs, picks, superseded facts) and partly on its replies: a vague opener, a vegetarian asking about Hearth & Hen, kids at 9:30pm, a solo diner craving Korean BBQ, an anniversary tonight, a change of mind, and the "ignore my earlier picks" regression. | Whenever the agent or its prompt changes |
+| Unit | The hours parser, cross-checked against every restaurant's own "Closed" note. Search over all fifty places at every hour of the week, checked minute by minute. The hand-checked flags (cash-only and 21+ against every restaurant's text, the trickiest diet and kids calls by hand), the tool guards, constraint carry-over, transcript assembly, rate-limit math, calendar files. | Every push |
+| Database | Fact superseding and both uniqueness rules, ownership checks, atomic rate-limit counters, and constraints reloading from the event log, against real Postgres. | Every relevant change, on a throwaway database branch |
+| Behavior | Nine tricky conversations replayed against the real model, judged mostly on what the agent *did* (tool inputs, picks, superseded facts) and partly on its replies: a vague opener, a vegetarian asking about Hearth & Hen, kids at 9:30pm, a solo diner craving Korean BBQ, an anniversary tonight, a change of mind, the "ignore my earlier picks" regression, a vegetarian who later asks for fried chicken, and a tied family poll where one vote comes with "I hate both". | Whenever the agent or its prompt changes |
 
-CI has two workflows. Every push runs lint, the type check, the unit tests, and a build. When agent code, the prompt, the schema, or dependencies change, a second workflow creates a throwaway Neon branch, wipes the user data it copied, and runs all 244 tests (database tests included) plus the 7 behavior scenarios, then deletes the branch. Tests never touch production.
+CI has two workflows. Every push runs lint, the type check, the unit tests, and a build. When agent code, the prompt, the schema, or dependencies change, a second workflow creates a throwaway Neon branch, wipes the user data it copied, and runs all 248 tests (database tests included) plus the 9 behavior scenarios, then deletes the branch. Tests never touch production.
 
 ---
 
@@ -171,7 +171,7 @@ Built with Next.js 16, TypeScript, Postgres on Neon through Drizzle, and Claude 
 
 ## Running locally
 
-Requires Node 22+, pnpm, a Neon Postgres database, and an Anthropic API key.
+Requires Node 22.9+, pnpm, a Neon Postgres database, and an Anthropic API key.
 
 ```bash
 pnpm install
@@ -180,4 +180,4 @@ pnpm db:migrate && pnpm db:seed
 pnpm dev
 ```
 
-`pnpm test` runs the suite (the database tests need a `TEST_DATABASE_URL`), `pnpm eval` replays the behavior scenarios against the real model, and `pnpm chat "where should I eat tonight"` holds a conversation in the terminal with every event printed.
+`pnpm test` runs the suite (the database tests run only when `TEST_DATABASE_URL` is set), `pnpm eval` replays the behavior scenarios against the real model, and `pnpm chat "where should I eat tonight"` holds a conversation in the terminal with every event printed.
