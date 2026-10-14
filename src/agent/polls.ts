@@ -125,6 +125,8 @@ export async function conversationReadPollResults(conversationId: string): Promi
         eq(agentEvents.conversationId, conversationId),
         eq(agentEvents.type, "tool_call"),
         sql`${agentEvents.payload}->>'name' = 'get_poll_results'`,
+        // Only calls that actually returned notes; a failed call (say, an invented poll id) read nothing.
+        sql`${agentEvents.payload}->>'isError' = 'false'`,
       ),
     )
     .limit(1);
