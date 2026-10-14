@@ -1,5 +1,6 @@
 const MAX_LINE_OCTETS = 75;
 const LOS_ANGELES = "America/Los_Angeles";
+const utf8 = new TextEncoder();
 
 /** Definition of the TZID the event uses (US Pacific rules since 2007), so every calendar app agrees on the time. */
 const LOS_ANGELES_VTIMEZONE = [
@@ -68,17 +69,20 @@ function escapeText(text: string): string {
 
 /** RFC 5545 line folding: lines longer than 75 octets continue on the next line after a space. */
 function foldLine(line: string): string {
-  const bytes = new TextEncoder().encode(line);
-  if (bytes.length <= MAX_LINE_OCTETS) return line;
+  if (utf8.encode(line).length <= MAX_LINE_OCTETS) return line;
   const parts: string[] = [];
   let current = "";
+  let currentOctets = 0;
   for (const char of line) {
+    const charOctets = utf8.encode(char).length;
     const limit = parts.length === 0 ? MAX_LINE_OCTETS : MAX_LINE_OCTETS - 1; // continuation lines start with a space
-    if (new TextEncoder().encode(current + char).length > limit) {
+    if (currentOctets + charOctets > limit) {
       parts.push(current);
       current = "";
+      currentOctets = 0;
     }
     current += char;
+    currentOctets += charOctets;
   }
   parts.push(current);
   return parts.join("\r\n ");
