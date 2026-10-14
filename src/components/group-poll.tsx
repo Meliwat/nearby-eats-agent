@@ -8,6 +8,8 @@ import type { PollView } from "@/agent/polls";
 
 const REFRESH_MS = 5000;
 const NAME_STORAGE_KEY = "nearby_voter_name";
+const INPUT_CLASS =
+  "w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-900";
 
 /** Fetches a poll and keeps it fresh while the page is open, so votes show up live. */
 export function usePoll(pollId: string) {
@@ -46,13 +48,14 @@ export function GroupPollPage() {
   }, []);
 
   async function vote(restaurantId: number) {
-    if (!name.trim()) return setError("Add your name first so the group knows who voted.");
+    const voterName = name.trim();
+    if (!voterName) return setError("Add your name first so the group knows who voted.");
     setError(null);
-    storeName(name.trim());
+    storeName(voterName);
     const response = await fetch(`/api/polls/${pollId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ restaurantId, name: name.trim(), note: note.trim() || null }),
+      body: JSON.stringify({ restaurantId, name: voterName, note: note.trim() || null }),
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -79,14 +82,14 @@ export function GroupPollPage() {
             onChange={(event) => setName(event.target.value)}
             placeholder="Your name"
             maxLength={40}
-            className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-900"
+            className={INPUT_CLASS}
           />
           <input
             value={note}
             onChange={(event) => setNote(event.target.value)}
             placeholder="Optional note, e.g. I'm vegetarian"
             maxLength={200}
-            className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-900"
+            className={INPUT_CLASS}
           />
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
