@@ -13,7 +13,7 @@ import {
   type DayOfWeek,
 } from "@/lib/restaurants/hours";
 import { formatMinute, searchRestaurants, type SearchFilters, type SearchResult } from "@/lib/restaurants/search";
-import { FACT_KEY_NAMES, FACT_KEYS, rememberFact, type FactChange } from "./facts";
+import { FACT_KEY_NAMES, FACT_KEYS, MAX_FACT_VALUE_LENGTH, rememberFact, type FactChange } from "./facts";
 import { createPoll, getPollView } from "./polls";
 
 /** Per-turn state the tools read and update. */
@@ -25,6 +25,11 @@ export interface ToolContext {
   catalog: CatalogRestaurant[];
   /** Restaurants the user turned down in this conversation; search never returns them. */
   rejectedIds: Set<number>;
+  /**
+   * Set once this turn has read text written by someone other than the user (friends' poll notes).
+   * After that, remember_fact is refused, so a friend's note can't plant itself in the user's memory.
+   */
+  readThirdPartyText: boolean;
   /** The most recent search this turn; recommend_restaurant must pick one of its candidates. */
   lastSearch: (SearchResult & { arrival: SearchFilters["arrival"] }) | null;
 }
@@ -73,7 +78,11 @@ function buildInputSchemas(cities: string[]) {
           .map(([key, { description }]) => `${key}: ${description}`)
           .join("; "),
       ),
-      value: z.string().describe("Short normalized value, e.g. \"vegetarian\" or \"4 people\""),
+      value: z
+        .string()
+        .min(1)
+        .max(MAX_FACT_VALUE_LENGTH)
+        .describe(`Short normalized value, e.g. "vegetarian" or "4 people" (at most ${MAX_FACT_VALUE_LENGTH} characters)`),
     }),
     recommend_restaurant: z.strictObject({
       restaurant_id: z.number().int().describe("id of a candidate from the latest search_restaurants call"),
@@ -171,6 +180,11 @@ export async function executeTool(
     case "get_restaurant":
       return runGetRestaurant(input as z.infer<ToolSchemas["get_restaurant"]>, ctx);
     case "remember_fact": {
+      if (ctx.readThirdPartyText) {
+        return failure(
+          "Not saved: this turn read friends' poll notes, which are not the user's own words. Use them in the search, and ask the user if something should be remembered.",
+        );
+      }
       const { key, value } = input as z.infer<ToolSchemas["remember_fact"]>;
       const change = await rememberFact({
         userId: ctx.userId,
@@ -310,6 +324,7 @@ async function runGetPollResults(input: z.infer<ToolSchemas["get_poll_results"]>
   const [poll] = await db.select({ conversationId: groupPolls.conversationId }).from(groupPolls).where(eq(groupPolls.id, input.poll_id));
   if (!poll || poll.conversationId !== ctx.conversationId) return failure("No poll with that id in this conversation.");
   const view = await getPollView(input.poll_id, ctx.userId);
+  ctx.readThirdPartyText = true;
   return {
     isError: false,
     factChanges: [],

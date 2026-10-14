@@ -62,6 +62,7 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
       now,
       catalog,
       rejectedIds: new Set(recs.filter((r) => r.status === "rejected").map((r) => r.restaurantId)),
+      readThirdPartyText: false,
       lastSearch: null,
     };
 
