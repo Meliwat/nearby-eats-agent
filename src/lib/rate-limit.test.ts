@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { clientIp, evaluateLimits, ipv6Prefix64, rejectCrossSite, windowStart, type Limit } from "./rate-limit";
+import {
+  clientIp,
+  evaluateLimits,
+  ipv6Prefix64,
+  noNulBytes,
+  rejectCrossSite,
+  rejectLargeBody,
+  windowStart,
+  type Limit,
+} from "./rate-limit";
 
 const limit: Limit = { bucket: "test", max: 2, windowSeconds: 60 };
 const now = new Date("2026-10-14T16:00:15Z");
@@ -65,5 +74,19 @@ describe("rejectCrossSite", () => {
 
   it("rejects simple content types that skip the CORS preflight", () => {
     expect(rejectCrossSite(post({ "content-type": "text/plain" }))?.status).toBe(415);
+  });
+});
+
+describe("edge validation", () => {
+  it("refuses bodies over the size limit before they are parsed", () => {
+    const big = new Request("https://x", { method: "POST", headers: { "content-length": "20000" } });
+    const small = new Request("https://x", { method: "POST", headers: { "content-length": "200" } });
+    expect(rejectLargeBody(big)?.status).toBe(413);
+    expect(rejectLargeBody(small)).toBeNull();
+  });
+
+  it("refuses NUL bytes, which Postgres text columns can't store", () => {
+    expect(noNulBytes("tacos tonight")).toBe(true);
+    expect(noNulBytes(`tacos${String.fromCharCode(0)}tonight`)).toBe(false);
   });
 });

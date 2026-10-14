@@ -30,13 +30,14 @@ export function summarizeToolCall(payload: ToolCallPayload): string {
  * A short system note describing what the agent did in a past turn, built from our own event log.
  * The rebuilt transcript only holds visible messages, so without this the model can't see that its
  * earlier picks were searched and verified, and may wrongly "confess" to skipping steps.
- * Contains only trusted data: our tool outputs, never friends' poll notes.
+ * Contains only trusted data: our own tool summaries, never error text or friends' poll notes.
  */
 export function buildActionNote(calls: ToolCallPayload[]): string | null {
   if (calls.length === 0) return null;
   const lines = calls.map((call) => {
     const filters = call.name === "search_restaurants" ? ` [${describeSearchInput(call.input)}]` : "";
-    return `- ${call.name}${filters}: ${summarizeToolCall(call)}`;
+    // A failed call's error text can echo model input (which may carry a friend's note), so it isn't repeated here.
+    return `- ${call.name}${filters}: ${call.isError ? "failed" : summarizeToolCall(call)}`;
   });
   return ["Your tool calls before this reply (from the system log; the user doesn't see this):", ...lines].join("\n");
 }

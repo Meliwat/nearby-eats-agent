@@ -5,7 +5,7 @@ import { loadCatalog } from "@/lib/restaurants/load-catalog";
 import { buildContextMessage, loadRecommendations, loadTranscript, SYSTEM_PROMPT } from "./context";
 import { agentEventSchema, type AgentEvent, type StreamMessage } from "./events";
 import { loadActiveFacts } from "./facts";
-import { summarizePolls } from "./polls";
+import { conversationReadPollResults, summarizePolls } from "./polls";
 import { buildTools, executeTool, type ToolContext, type ToolSchemas } from "./tools";
 
 export const MODEL = "claude-sonnet-5-5";
@@ -55,12 +55,13 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
   const turnStarted = Date.now();
   try {
     const now = new Date();
-    const [catalog, transcript, facts, recs, polls] = await Promise.all([
+    const [catalog, transcript, facts, recs, polls, readPollNotesEarlier] = await Promise.all([
       loadCatalog(),
       loadTranscript(conversationId),
       loadActiveFacts(userId, conversationId),
       loadRecommendations(conversationId),
       summarizePolls(conversationId),
+      conversationReadPollResults(conversationId),
     ]);
     const { definitions, schemas } = buildTools(catalog);
     const ctx: ToolContext = {
@@ -71,6 +72,7 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
       catalog,
       rejectedIds: new Set(recs.filter((r) => r.status === "rejected").map((r) => r.restaurantId)),
       readThirdPartyText: false,
+      conversationReadThirdPartyText: readPollNotesEarlier,
       lastSearch: null,
     };
 

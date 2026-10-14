@@ -1,6 +1,6 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { groupPollOptions, groupPolls, groupVotes, restaurants } from "@/db/schema";
+import { agentEvents, groupPollOptions, groupPolls, groupVotes, restaurants } from "@/db/schema";
 
 export interface PollOptionView {
   restaurantId: number;
@@ -113,4 +113,20 @@ export async function summarizePolls(conversationId: string): Promise<string[]> 
     const tallies = rows.filter((row) => row.pollId === pollId).map((row) => `${row.name} (id ${row.restaurantId}): ${row.votes}`);
     return `poll ${pollId}: ${tallies.join(", ")}`;
   });
+}
+
+/** True if any earlier turn in this conversation read friends' poll notes (see ToolContext.conversationReadThirdPartyText). */
+export async function conversationReadPollResults(conversationId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: agentEvents.id })
+    .from(agentEvents)
+    .where(
+      and(
+        eq(agentEvents.conversationId, conversationId),
+        eq(agentEvents.type, "tool_call"),
+        sql`${agentEvents.payload}->>'name' = 'get_poll_results'`,
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
 }

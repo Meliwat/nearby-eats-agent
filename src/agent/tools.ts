@@ -29,6 +29,11 @@ export interface ToolContext {
    * After that, remember_fact is refused, so a friend's note can't plant itself in the user's memory.
    */
   readThirdPartyText: boolean;
+  /**
+   * An earlier turn in this conversation read friends' poll notes. The agent may have restated them
+   * in its replies, so durable (user-scope) facts are refused for the rest of the conversation.
+   */
+  conversationReadThirdPartyText: boolean;
   /** The most recent search this turn; recommend_restaurant must pick one of its candidates. */
   lastSearch: (SearchResult & { arrival: SearchFilters["arrival"] }) | null;
 }
@@ -42,6 +47,7 @@ export interface ToolOutcome {
 /** Name lookups are for a specific place; a near-empty query would return the whole catalog. */
 const MIN_NAME_QUERY_LENGTH = 3;
 const MAX_NAME_MATCHES = 5;
+const MAX_NAME_QUERY_LENGTH = 60;
 
 const clockTime = z
   .string()
@@ -73,7 +79,11 @@ function buildInputSchemas(cities: string[]) {
       avoid_cash_only: z.boolean().describe("True if they can't pay cash"),
     }),
     get_restaurant: z.strictObject({
-      name: z.string().min(MIN_NAME_QUERY_LENGTH).describe(`Restaurant name, or at least ${MIN_NAME_QUERY_LENGTH} letters of it`),
+      name: z
+        .string()
+        .min(MIN_NAME_QUERY_LENGTH)
+        .max(MAX_NAME_QUERY_LENGTH)
+        .describe(`Restaurant name, or at least ${MIN_NAME_QUERY_LENGTH} letters of it`),
     }),
     remember_fact: z.strictObject({
       key: z.enum(FACT_KEY_NAMES).describe(
@@ -83,6 +93,7 @@ function buildInputSchemas(cities: string[]) {
       ),
       value: z
         .string()
+        .trim()
         .min(1)
         .max(MAX_FACT_VALUE_LENGTH)
         .describe(`Short normalized value, e.g. "vegetarian" or "4 people" (at most ${MAX_FACT_VALUE_LENGTH} characters)`),
@@ -239,7 +250,7 @@ function runSearch(input: ToolInput<"search_restaurants">, ctx: ToolContext): To
 function runGetRestaurant(input: ToolInput<"get_restaurant">, ctx: ToolContext): ToolOutcome {
   const query = input.name.toLowerCase();
   const matches = ctx.catalog.filter((r) => r.name.toLowerCase().includes(query)).slice(0, MAX_NAME_MATCHES);
-  if (matches.length === 0) return failure(`No restaurant matches "${input.name}"`);
+  if (matches.length === 0) return failure("No restaurant on the list matches that name.");
   return { output: matches.map(describeForModel), isError: false, factChanges: [] };
 }
 
@@ -247,6 +258,11 @@ async function runRememberFact(input: ToolInput<"remember_fact">, ctx: ToolConte
   if (ctx.readThirdPartyText) {
     return failure(
       "Not saved: this turn read friends' poll notes, which are not the user's own words. Use them in the search, and ask the user if something should be remembered.",
+    );
+  }
+  if (ctx.conversationReadThirdPartyText && FACT_KEYS[input.key].scope === "user") {
+    return failure(
+      "Not saved: this conversation includes friends' poll notes, so long-term preferences are only saved in a new conversation, in the user's own words.",
     );
   }
   const change = await rememberFact({

@@ -92,6 +92,19 @@ export function rejectCrossSite(request: Request): Response | null {
   return null;
 }
 
+/** Request bodies here are a short message or a vote; anything bigger is refused before parsing. */
+const MAX_BODY_BYTES = 16_000;
+
+export function rejectLargeBody(request: Request): Response | null {
+  const length = Number(request.headers.get("content-length") ?? 0);
+  return length > MAX_BODY_BYTES ? Response.json({ error: "Request too large" }, { status: 413 }) : null;
+}
+
+/** Postgres text columns can't store NUL bytes, so they are refused at the edge instead of failing on insert. */
+export function noNulBytes(text: string): boolean {
+  return !text.includes("\0");
+}
+
 export function tooManyRequests(result: LimitResult, message: string): Response {
   return Response.json({ error: message }, { status: 429, headers: { "Retry-After": String(result.retryAfterSeconds) } });
 }

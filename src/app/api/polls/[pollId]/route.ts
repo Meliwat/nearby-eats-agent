@@ -1,13 +1,13 @@
 import { z } from "zod";
 import { castVote, getPollView } from "@/agent/polls";
-import { clientIp, LIMITS, rejectCrossSite, tooManyRequests } from "@/lib/rate-limit";
+import { clientIp, LIMITS, noNulBytes, rejectCrossSite, rejectLargeBody, tooManyRequests } from "@/lib/rate-limit";
 import { consumeLimits } from "@/lib/rate-limit-store";
 import { getOrCreateUserId, getUserId } from "@/lib/session";
 
 const voteRequest = z.strictObject({
   restaurantId: z.number().int(),
-  name: z.string().trim().min(1).max(40),
-  note: z.string().trim().max(200).nullable(),
+  name: z.string().trim().min(1).max(40).refine(noNulBytes, "Name contains invalid characters"),
+  note: z.string().trim().max(200).refine(noNulBytes, "Note contains invalid characters").nullable(),
 });
 
 /** Public by design: anyone with the (unguessable) link can see the poll. No chat content is exposed. */
@@ -22,7 +22,7 @@ export async function GET(request: Request, { params }: RouteContext<"/api/polls
 }
 
 export async function POST(request: Request, { params }: RouteContext<"/api/polls/[pollId]">) {
-  const crossSite = rejectCrossSite(request);
+  const crossSite = rejectCrossSite(request) ?? rejectLargeBody(request);
   if (crossSite) return crossSite;
   const { pollId } = await params;
   if (!z.uuid().safeParse(pollId).success) return Response.json({ error: "Poll not found" }, { status: 404 });

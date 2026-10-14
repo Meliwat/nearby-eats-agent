@@ -3,7 +3,7 @@ import { db } from "@/db/client";
 import { conversations } from "@/db/schema";
 import type { StreamMessage } from "@/agent/events";
 import { runTurn } from "@/agent/loop";
-import { clientIp, LIMITS, rejectCrossSite, tooManyRequests } from "@/lib/rate-limit";
+import { clientIp, LIMITS, noNulBytes, rejectCrossSite, rejectLargeBody, tooManyRequests } from "@/lib/rate-limit";
 import { consumeLimits, deleteExpiredCounters } from "@/lib/rate-limit-store";
 import { getOrCreateUserId, ownsConversation } from "@/lib/session";
 
@@ -12,12 +12,12 @@ export const maxDuration = 60;
 
 const chatRequest = z.strictObject({
   conversationId: z.uuid().nullable(),
-  message: z.string().trim().min(1).max(2000),
+  message: z.string().trim().min(1).max(2000).refine(noNulBytes, "Message contains invalid characters"),
 });
 
 /** Runs one turn and streams it back as NDJSON: one StreamMessage per line. */
 export async function POST(request: Request) {
-  const crossSite = rejectCrossSite(request);
+  const crossSite = rejectCrossSite(request) ?? rejectLargeBody(request);
   if (crossSite) return crossSite;
   const body = chatRequest.safeParse(await request.json().catch(() => null));
   if (!body.success) return Response.json({ error: z.prettifyError(body.error) }, { status: 400 });
