@@ -13,7 +13,8 @@
     "db:seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts",
     "chat": "tsx --env-file-if-exists=.env.local scripts/chat.ts",
     "eval": "tsx --env-file-if-exists=.env.local scripts/eval.ts",
-    "export:prompt": "tsx --env-file-if-exists=.env.local scripts/export-prompt.ts"
+    "export:prompt": "tsx --env-file-if-exists=.env.local scripts/export-prompt.ts",
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.133.0",
@@ -27,7 +28,7 @@
   "devDependencies": {
     "@next/env": "16.4.0",
     "@tailwindcss/turbopack": "^4",
-    "@types/node": "^20",
+    "@types/node": "^22.20.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "drizzle-kit": "0.31.11",
