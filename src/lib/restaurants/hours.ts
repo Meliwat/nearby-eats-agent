@@ -63,12 +63,7 @@ export function parseHours(text: string): OpenInterval[] {
 
 /** True if any interval covers the given local day and minute, including spillover past midnight. */
 export function isOpenAt(intervals: OpenInterval[], day: DayOfWeek, minute: number): boolean {
-  const previousDay = ((day + 6) % 7) as DayOfWeek;
-  return intervals.some(
-    (interval) =>
-      (interval.day === day && minute >= interval.openMinute && minute < interval.closeMinute) ||
-      (interval.day === previousDay && minute + MINUTES_PER_DAY < interval.closeMinute),
-  );
+  return closingMinuteAt(intervals, day, minute) !== null;
 }
 
 /** True if open at `minute` and still open `durationMinutes` later (rolling into the next day if needed). */
@@ -141,8 +136,7 @@ export function toLocalDayMinute(date: Date, timeZone: string): { day: DayOfWeek
     hourCycle: "h23",
   }).formatToParts(date);
   const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  const day = DAY_NAMES.indexOf(part("weekday") as (typeof DAY_NAMES)[number]) as DayOfWeek;
-  return { day, minute: Number(part("hour")) * 60 + Number(part("minute")) };
+  return { day: dayIndex(part("weekday")), minute: Number(part("hour")) * 60 + Number(part("minute")) };
 }
 
 function parseDays(spec: string): DayOfWeek[] {
@@ -164,10 +158,11 @@ function dayIndex(name: string): DayOfWeek {
 }
 
 function parseTime(token: string): number {
-  const match = TIME_PATTERN.exec(token.trim());
+  const text = token.trim();
+  const match = TIME_PATTERN.exec(text);
   if (!match) throw new Error(`Unrecognized time "${token}"`);
-  if (token.trim() === "noon") return 12 * 60;
-  if (token.trim() === "midnight") return 0;
+  if (text === "noon") return 12 * 60;
+  if (text === "midnight") return 0;
   const [, hourText, minuteText = "0", meridiem] = match;
   const hour = (Number(hourText) % 12) + (meridiem === "pm" ? 12 : 0);
   return hour * 60 + Number(minuteText);
