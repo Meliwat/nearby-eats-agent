@@ -148,10 +148,14 @@ export const userFacts = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    // The database guarantees one current value per key; history lives in superseded rows.
-    uniqueIndex("user_facts_one_active_per_key")
+    // The database guarantees one current value per key, per scope: one durable value per user,
+    // and one situational value per conversation. History lives in superseded rows.
+    uniqueIndex("user_facts_one_active_user_fact")
       .on(table.userId, table.key)
-      .where(sql`${table.status} = 'active'`),
+      .where(sql`${table.status} = 'active' and ${table.scope} = 'user'`),
+    uniqueIndex("user_facts_one_active_conversation_fact")
+      .on(table.conversationId, table.key)
+      .where(sql`${table.status} = 'active' and ${table.scope} = 'conversation'`),
   ],
 );
 

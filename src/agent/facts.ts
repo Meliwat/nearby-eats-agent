@@ -26,6 +26,8 @@ export const FACT_KEYS = {
 
 export type FactKey = keyof typeof FACT_KEYS;
 export const FACT_KEY_NAMES = Object.keys(FACT_KEYS) as [FactKey, ...FactKey[]];
+/** Facts are short labels ("vegetarian", "4 people"), never paragraphs; this also bounds what reaches the context. */
+export const MAX_FACT_VALUE_LENGTH = 100;
 
 export interface ActiveFact {
   key: string;
@@ -57,10 +59,10 @@ export async function loadActiveFacts(userId: string, conversationId: string | n
 }
 
 /**
- * Records a fact. If the user already has a different active value for the key, the old row is
- * marked superseded and the new row points back at it, in one transaction. The partial unique
- * index (one active row per user and key) makes a concurrent double-write fail instead of
- * silently leaving two current values.
+ * Records a fact. If there is already a different active value for the key in the same scope
+ * (the user's durable facts, or this conversation's situational ones), the old row is marked
+ * superseded and the new row points back at it, in one transaction. The partial unique indexes
+ * make a concurrent double-write fail instead of silently leaving two current values.
  */
 export async function rememberFact(input: {
   userId: string;
@@ -73,10 +75,15 @@ export async function rememberFact(input: {
   const value = input.value.trim();
   const scope = FACT_KEYS[key].scope;
 
+  // Situational facts belong to one conversation; "party of 4" here must not touch another chat's value.
+  const sameScope =
+    scope === "conversation"
+      ? and(eq(userFacts.scope, "conversation"), eq(userFacts.conversationId, conversationId))
+      : eq(userFacts.scope, "user");
   const [current] = await db
     .select({ id: userFacts.id, value: userFacts.value })
     .from(userFacts)
-    .where(and(eq(userFacts.userId, userId), eq(userFacts.key, key), eq(userFacts.status, "active")));
+    .where(and(eq(userFacts.userId, userId), eq(userFacts.key, key), eq(userFacts.status, "active"), sameScope));
 
   if (current && current.value.toLowerCase() === value.toLowerCase()) {
     return { action: "unchanged", key, value, previousValue: current.value, scope };

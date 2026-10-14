@@ -1,0 +1,3 @@
+DROP INDEX "user_facts_one_active_per_key";--> statement-breakpoint
+CREATE UNIQUE INDEX "user_facts_one_active_user_fact" ON "user_facts" USING btree ("user_id","key") WHERE "user_facts"."status" = 'active' and "user_facts"."scope" = 'user';--> statement-breakpoint
+CREATE UNIQUE INDEX "user_facts_one_active_conversation_fact" ON "user_facts" USING btree ("conversation_id","key") WHERE "user_facts"."status" = 'active' and "user_facts"."scope" = 'conversation';

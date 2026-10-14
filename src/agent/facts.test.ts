@@ -51,6 +51,21 @@ describe.skipIf(!process.env.DATABASE_URL)("rememberFact (database)", () => {
     expect(active).toHaveLength(2);
   });
 
+  it("keeps each conversation's situational facts separate, even with the same value", async () => {
+    await remember("party_size", "4 people");
+    const [{ id: otherConversation }] = await db.insert(schema.conversations).values({ userId }).returning();
+    const inOther = await facts.rememberFact({
+      userId,
+      conversationId: otherConversation,
+      sourceMessageId: messageId,
+      key: "party_size",
+      value: "4 people",
+    });
+    expect(inOther.action).toBe("added");
+    expect((await facts.loadActiveFacts(userId, otherConversation)).find((f) => f.key === "party_size")?.value).toBe("4 people");
+    expect((await facts.loadActiveFacts(userId, conversationId)).find((f) => f.key === "party_size")?.value).toBe("4 people");
+  });
+
   it("lets the database reject a second active value for the same key", async () => {
     const duplicate = db.insert(schema.userFacts).values({
       userId,
