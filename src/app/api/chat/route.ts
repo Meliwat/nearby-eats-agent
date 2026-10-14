@@ -32,6 +32,18 @@ export async function POST(request: Request) {
   const perUser = await consumeLimits([{ limit: LIMITS.chatPerUser, key: userId }]);
   if (!perUser.allowed) return tooManyRequests(perUser, "You're texting faster than I can find tables. Give it a minute.");
 
+  // Reject requests for someone else's conversation, or while a turn is still running, before they
+  // count against the daily budget everyone shares.
+  let conversationId = body.data.conversationId;
+  if (conversationId !== null) {
+    if (!(await ownsConversation(userId, conversationId))) {
+      return Response.json({ error: "Conversation not found" }, { status: 404 });
+    }
+    if (await hasTurnInProgress(conversationId)) {
+      return Response.json({ error: "Still working on your last message. One moment." }, { status: 409 });
+    }
+  }
+
   const global = await consumeLimits([
     { limit: LIMITS.chatGlobal, key: "all" },
     { limit: LIMITS.tokensGlobal, key: "all", amount: 0 },
@@ -40,14 +52,7 @@ export async function POST(request: Request) {
   // The first chat of a new day is a cheap, predictable moment to clear out old counters.
   if (global.counts[0] === 1) await deleteExpiredCounters();
 
-  let conversationId = body.data.conversationId;
-  if (conversationId === null) {
-    [{ id: conversationId }] = await db.insert(conversations).values({ userId }).returning({ id: conversations.id });
-  } else if (!(await ownsConversation(userId, conversationId))) {
-    return Response.json({ error: "Conversation not found" }, { status: 404 });
-  } else if (await hasTurnInProgress(conversationId)) {
-    return Response.json({ error: "Still working on your last message. One moment." }, { status: 409 });
-  }
+  conversationId ??= (await db.insert(conversations).values({ userId }).returning({ id: conversations.id }))[0].id;
 
   const encoder = new TextEncoder();
   const turn = { userId, conversationId, text: body.data.message };
