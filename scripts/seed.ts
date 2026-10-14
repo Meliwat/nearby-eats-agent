@@ -7,17 +7,12 @@ import { readFileSync } from "node:fs";
 import { sql } from "drizzle-orm";
 import { db } from "../src/db/client";
 import { restaurantHours, restaurants } from "../src/db/schema";
-import { RESTAURANT_ATTRIBUTES } from "../src/lib/restaurants/attributes";
 import { toRestaurantRow } from "../src/lib/restaurants/catalog";
 import { parseRestaurantFile } from "../src/lib/restaurants/parse-source";
 
 const source = parseRestaurantFile(readFileSync("data/restaurants.txt", "utf8"));
 
-const restaurantRows = source.map((restaurant) => {
-  const attributes = RESTAURANT_ATTRIBUTES.find((a) => a.id === restaurant.id);
-  if (!attributes) throw new Error(`No attribute flags for #${restaurant.id} ${restaurant.name}`);
-  return toRestaurantRow(restaurant, attributes);
-});
+const restaurantRows = source.map(toRestaurantRow);
 
 const hourRows = source.flatMap((restaurant) =>
   restaurant.hours.map((interval) => ({ restaurantId: restaurant.id, ...interval })),

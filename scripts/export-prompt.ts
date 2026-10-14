@@ -7,14 +7,10 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { buildContextMessage, SYSTEM_PROMPT } from "../src/agent/context";
 import { MODEL } from "../src/agent/loop";
 import { buildTools } from "../src/agent/tools";
-import { RESTAURANT_ATTRIBUTES } from "../src/lib/restaurants/attributes";
-import { toRestaurantRow } from "../src/lib/restaurants/catalog";
+import { catalogFromSource } from "../src/lib/restaurants/catalog";
 import { parseRestaurantFile } from "../src/lib/restaurants/parse-source";
 
-const catalog = parseRestaurantFile(readFileSync("data/restaurants.txt", "utf8")).map((source) => ({
-  ...toRestaurantRow(source, RESTAURANT_ATTRIBUTES.find((a) => a.id === source.id)!),
-  hours: source.hours,
-}));
+const catalog = catalogFromSource(parseRestaurantFile(readFileSync("data/restaurants.txt", "utf8")));
 
 const exampleContext = buildContextMessage(
   new Date("2026-10-16T02:30:00Z"),

@@ -1,18 +1,13 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { RESTAURANT_ATTRIBUTES } from "./attributes";
-import { toRestaurantRow, type CatalogRestaurant } from "./catalog";
+import { catalogFromSource } from "./catalog";
 import { isOpenThrough, type DayOfWeek } from "./hours";
 import { parseRestaurantFile } from "./parse-source";
 import { formatMinute, MIN_VISIT_MINUTES, searchRestaurants, type SearchFilters } from "./search";
 
-// The same rows the seed script writes, built without a database.
-const catalog: CatalogRestaurant[] = parseRestaurantFile(
-  readFileSync(new URL("../../../data/restaurants.txt", import.meta.url), "utf8"),
-).map((source) => ({
-  ...toRestaurantRow(source, RESTAURANT_ATTRIBUTES.find((a) => a.id === source.id)!),
-  hours: source.hours,
-}));
+const catalog = catalogFromSource(
+  parseRestaurantFile(readFileSync(new URL("../../../data/restaurants.txt", import.meta.url), "utf8")),
+);
 
 const MON = 1, FRI = 5, SAT = 6;
 const at = (hour: number, minute = 0) => hour * 60 + minute;
