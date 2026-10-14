@@ -1,8 +1,21 @@
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-// Runs against the real database (the partial unique index is part of what's tested).
+// Runs against the real database (the partial unique indexes are part of what's tested).
 // Each run creates a throwaway user and deletes it afterward; deletes cascade to everything else.
+// The tests run in order and build on each other's rows, like one user's conversation history.
+const UNIQUE_VIOLATION = "23505";
+
+/** The Postgres error code a write fails with (drizzle wraps the driver error as `cause`). */
+async function postgresErrorCode(write: PromiseLike<unknown>): Promise<string | undefined> {
+  try {
+    await write;
+    return undefined;
+  } catch (error) {
+    const { code, cause } = error as { code?: string; cause?: { code?: string } };
+    return code ?? cause?.code;
+  }
+}
 describe.skipIf(!process.env.DATABASE_URL)("rememberFact (database)", () => {
   let db: typeof import("@/db/client").db;
   let schema: typeof import("@/db/schema");
@@ -26,6 +39,16 @@ describe.skipIf(!process.env.DATABASE_URL)("rememberFact (database)", () => {
   afterAll(async () => {
     if (userId) await db.delete(schema.users).where(eq(schema.users.id, userId));
   });
+
+  /** A conversation with one user message, so facts can cite a real source message in it. */
+  async function newConversation() {
+    const [{ id: newConversationId }] = await db.insert(schema.conversations).values({ userId }).returning();
+    const [{ id: newMessageId }] = await db
+      .insert(schema.messages)
+      .values({ conversationId: newConversationId, role: "user", content: "test" })
+      .returning();
+    return { conversationId: newConversationId, sourceMessageId: newMessageId };
+  }
 
   const remember = (key: "diet" | "party_size", value: string) =>
     facts.rememberFact({ userId, conversationId, sourceMessageId: messageId, key, value });
@@ -53,20 +76,18 @@ describe.skipIf(!process.env.DATABASE_URL)("rememberFact (database)", () => {
 
   it("keeps each conversation's situational facts separate, even with the same value", async () => {
     await remember("party_size", "4 people");
-    const [{ id: otherConversation }] = await db.insert(schema.conversations).values({ userId }).returning();
-    const inOther = await facts.rememberFact({
-      userId,
-      conversationId: otherConversation,
-      sourceMessageId: messageId,
-      key: "party_size",
-      value: "4 people",
-    });
+    const other = await newConversation();
+    const inOther = await facts.rememberFact({ userId, ...other, key: "party_size", value: "4 people" });
     expect(inOther.action).toBe("added");
-    expect((await facts.loadActiveFacts(userId, otherConversation)).find((f) => f.key === "party_size")?.value).toBe("4 people");
-    expect((await facts.loadActiveFacts(userId, conversationId)).find((f) => f.key === "party_size")?.value).toBe("4 people");
+
+    // A change of mind in the first conversation must not touch the other one.
+    await remember("party_size", "6 people");
+    const partySize = async (id: string) => (await facts.loadActiveFacts(userId, id)).find((f) => f.key === "party_size")?.value;
+    expect(await partySize(conversationId)).toBe("6 people");
+    expect(await partySize(other.conversationId)).toBe("4 people");
   });
 
-  it("lets the database reject a second active value for the same key", async () => {
+  it("lets the database reject a second active durable value for the same key", async () => {
     const duplicate = db.insert(schema.userFacts).values({
       userId,
       conversationId,
@@ -75,12 +96,23 @@ describe.skipIf(!process.env.DATABASE_URL)("rememberFact (database)", () => {
       value: "pescatarian",
       scope: "user",
     });
-    await expect(duplicate).rejects.toThrow();
+    expect(await postgresErrorCode(duplicate)).toBe(UNIQUE_VIOLATION);
+  });
+
+  it("lets the database reject a second active situational value in one conversation", async () => {
+    const duplicate = db.insert(schema.userFacts).values({
+      userId,
+      conversationId,
+      sourceMessageId: messageId,
+      key: "party_size",
+      value: "8 people",
+      scope: "conversation",
+    });
+    expect(await postgresErrorCode(duplicate)).toBe(UNIQUE_VIOLATION);
   });
 
   it("keeps conversation-scoped facts out of other conversations", async () => {
-    await remember("party_size", "6 people");
-    const [{ id: nextConversation }] = await db.insert(schema.conversations).values({ userId }).returning();
+    const { conversationId: nextConversation } = await newConversation();
 
     const here = await facts.loadActiveFacts(userId, conversationId);
     const there = await facts.loadActiveFacts(userId, nextConversation);
