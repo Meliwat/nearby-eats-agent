@@ -32,7 +32,7 @@ export function carryForward(
   previous: AppliedConstraints,
   requested: AppliedConstraints,
   dropped: DroppableConstraint[],
-): { applied: AppliedConstraints; carried: string[] } {
+): { applied: AppliedConstraints; carried: string[]; dropped: DroppableConstraint[] } {
   const keeps = (constraint: DroppableConstraint) => !dropped.includes(constraint);
   const carriedDiets = previous.diets.filter((diet) => keeps(diet) && !requested.diets.includes(diet));
   const carryKids = previous.with_kids && keeps("kids") && !requested.with_kids;
@@ -55,5 +55,22 @@ export function carryForward(
       ...(carryBudget ? [`budget up to ${"$".repeat(previous.max_price_tier!)}`] : []),
       ...(carryCash ? ["no cash-only"] : []),
     ],
+    // Only drops that actually lifted an earlier constraint this search didn't ask for again.
+    dropped: dropped.filter((constraint) => wasApplied(previous, constraint) && !wasApplied(requested, constraint)),
   };
+}
+
+function wasApplied(constraints: AppliedConstraints, constraint: DroppableConstraint): boolean {
+  switch (constraint) {
+    case "kids":
+      return constraints.with_kids;
+    case "party_size":
+      return constraints.party_size !== null;
+    case "budget":
+      return constraints.max_price_tier !== null;
+    case "cash":
+      return constraints.avoid_cash_only;
+    default:
+      return constraints.diets.includes(constraint);
+  }
 }

@@ -16,6 +16,11 @@ describe("carryForward", () => {
     expect(carried).toEqual(["vegetarian", "kids", "party of 4", "budget up to $$", "no cash-only"]);
   });
 
+  it("reports only drops that lifted something", () => {
+    const requested = { ...NO_CONSTRAINTS, with_kids: true };
+    expect(carryForward(earlier, requested, ["vegan", "kids", "party_size"]).dropped).toEqual(["party_size"]);
+  });
+
   it("lets the new search change a value, and adds new constraints", () => {
     const requested = { ...NO_CONSTRAINTS, diets: ["vegan" as const], party_size: 6, max_price_tier: 3 };
     const { applied } = carryForward(earlier, requested, []);
@@ -29,6 +34,6 @@ describe("carryForward", () => {
   });
 
   it("carries nothing at the start of a conversation", () => {
-    expect(carryForward(NO_CONSTRAINTS, NO_CONSTRAINTS, [])).toEqual({ applied: NO_CONSTRAINTS, carried: [] });
+    expect(carryForward(NO_CONSTRAINTS, NO_CONSTRAINTS, [])).toEqual({ applied: NO_CONSTRAINTS, carried: [], dropped: [] });
   });
 });

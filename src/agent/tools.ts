@@ -235,7 +235,7 @@ function runSearch(input: ToolInput<"search_restaurants">, ctx: ToolContext): To
 
   const { day, minute, rolledToTomorrow, ...resolved } = resolveArrival(ctx.now, RESTAURANT_TIME_ZONE, daysFromToday, input.time);
   const arrival = { day, minute, daysFromToday: resolved.daysFromToday };
-  const { applied, carried } = carryForward(ctx.constraints, input, input.drop_constraints);
+  const { applied, carried, dropped } = carryForward(ctx.constraints, input, input.drop_constraints);
   const result = searchRestaurants(ctx.catalog, {
     arrival,
     diets: applied.diets,
@@ -256,7 +256,7 @@ function runSearch(input: ToolInput<"search_restaurants">, ctx: ToolContext): To
       arrival: `${DAY_NAMES[day]} ${formatMinute(minute)}`,
       applied_constraints: applied,
       ...(carried.length > 0 && { carried_over: carried }),
-      ...(input.drop_constraints.length > 0 && { dropped: input.drop_constraints }),
+      ...(dropped.length > 0 && { dropped }),
       ...(rolledToTomorrow && { note: "That time already passed today, so this searched tomorrow. Tell the user." }),
       candidate_count: result.candidates.length,
       candidates: result.candidates.map(describeForModel),

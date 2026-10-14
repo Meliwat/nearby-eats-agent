@@ -8,7 +8,7 @@ export function summarizeToolCall(payload: ToolCallPayload): string {
   if (payload.isError) return `failed: ${String(output.error)}`;
   switch (payload.name) {
     case "search_restaurants":
-      return `${output.arrival}: ${output.candidate_count} fit, ${(output.excluded as unknown[]).length} ruled out`;
+      return `${output.arrival} [${describeSearch(output)}]: ${output.candidate_count} fit, ${(output.excluded as unknown[]).length} ruled out`;
     case "recommend_restaurant":
       return `picked ${output.recommended}`;
     case "remember_fact":
@@ -35,29 +35,26 @@ export function summarizeToolCall(payload: ToolCallPayload): string {
 export function buildActionNote(calls: ToolCallPayload[]): string | null {
   if (calls.length === 0) return null;
   const lines = calls.map((call) => {
-    const filters = call.name === "search_restaurants" ? ` [${describeSearchInput(call.input)}]` : "";
     // A failed call's error text can echo model input (which may carry a friend's note), so it isn't repeated here.
-    return `- ${call.name}${filters}: ${call.isError ? "failed" : summarizeToolCall(call)}`;
+    return `- ${call.name}: ${call.isError ? "failed" : summarizeToolCall(call)}`;
   });
   return ["Your tool calls before this reply (from the system log; the user doesn't see this):", ...lines].join("\n");
 }
 
-function describeSearchInput(input: unknown): string {
-  const search = input as {
-    diets?: string[];
-    with_kids?: boolean;
-    party_size?: number | null;
-    max_price_tier?: number | null;
-    cities?: string[];
-    avoid_cash_only?: boolean;
-  };
-  const parts = [
-    search.diets?.length ? `diets: ${search.diets.join(", ")}` : null,
-    search.with_kids ? "with kids" : null,
-    search.party_size ? `party of ${search.party_size}` : null,
-    search.max_price_tier ? `up to ${"$".repeat(search.max_price_tier)}` : null,
-    search.cities?.length ? `in ${search.cities.join(", ")}` : null,
-    search.avoid_cash_only ? "no cash-only" : null,
-  ].filter(Boolean);
-  return parts.length ? parts.join("; ") : "no extra constraints";
+/** The constraints a search applied (including ones carried from earlier searches), and any it dropped. */
+function describeSearch(output: Record<string, unknown>): string {
+  const applied = output.applied_constraints as
+    | { diets: string[]; with_kids: boolean; party_size: number | null; max_price_tier: number | null; avoid_cash_only: boolean }
+    | undefined;
+  const parts = applied
+    ? [
+        applied.diets.length ? applied.diets.join(", ") : null,
+        applied.with_kids ? "with kids" : null,
+        applied.party_size ? `party of ${applied.party_size}` : null,
+        applied.max_price_tier ? `up to ${"$".repeat(applied.max_price_tier)}` : null,
+        applied.avoid_cash_only ? "no cash-only" : null,
+      ].filter(Boolean)
+    : [];
+  const dropped = (output.dropped as string[] | undefined)?.length ? `; dropped ${(output.dropped as string[]).join(", ")}` : "";
+  return `${parts.length ? parts.join("; ") : "no extra constraints"}${dropped}`;
 }
