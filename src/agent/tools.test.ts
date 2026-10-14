@@ -97,14 +97,11 @@ describe("executeTool", () => {
     expect(errorOf(outcome)).toMatch(/friends' poll notes/);
   });
 
-  it("refuses durable facts for the rest of a conversation that read poll notes", async () => {
-    const outcome = await executeTool(
-      "remember_fact",
-      { key: "allergies", value: "peanuts" },
-      schemas,
-      context({ conversationReadThirdPartyText: true }),
-    );
-    expect(errorOf(outcome)).toMatch(/long-term preferences/);
+  it("refuses every fact for the rest of a conversation that read poll notes", async () => {
+    const ctx = context({ conversationReadThirdPartyText: true });
+    for (const fact of [{ key: "allergies", value: "peanuts" }, { key: "party_needs", value: "friend is vegan" }]) {
+      expect(errorOf(await executeTool("remember_fact", fact, schemas, ctx))).toMatch(/friends' poll notes/);
+    }
   });
 
   it("keeps an earlier diet even when a later search leaves it out", async () => {

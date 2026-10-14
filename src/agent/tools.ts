@@ -34,7 +34,8 @@ export interface ToolContext {
   readThirdPartyText: boolean;
   /**
    * An earlier turn in this conversation read friends' poll notes. The agent may have restated them
-   * in its replies, so durable (user-scope) facts are refused for the rest of the conversation.
+   * in its replies, so no facts are saved for the rest of the conversation: saved facts appear in
+   * the system-level context, where a friend's words must never land.
    */
   conversationReadThirdPartyText: boolean;
   /** Hard constraints the conversation's searches have applied so far; later searches keep them (see constraints.ts). */
@@ -275,9 +276,9 @@ async function runRememberFact(input: ToolInput<"remember_fact">, ctx: ToolConte
       "Not saved: this turn read friends' poll notes, which are not the user's own words. Use them in the search, and ask the user if something should be remembered.",
     );
   }
-  if (ctx.conversationReadThirdPartyText && FACT_KEYS[input.key].scope === "user") {
+  if (ctx.conversationReadThirdPartyText) {
     return failure(
-      "Not saved: this conversation includes friends' poll notes, so long-term preferences are only saved in a new conversation, in the user's own words.",
+      "Not saved: this conversation includes friends' poll notes, so facts are only saved in a new conversation, in the user's own words. Search constraints still carry over.",
     );
   }
   const change = await rememberFact({
