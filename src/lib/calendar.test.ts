@@ -23,6 +23,20 @@ describe("buildVisitIcs", () => {
     expect(ics).toContain(String.raw`DESCRIPTION:Fried chicken\; get the biscuits`);
   });
 
+  it("escapes every kind of line break, including a lone carriage return", () => {
+    const withBreaks = buildVisitIcs({
+      restaurant: "Place",
+      address: "Somewhere",
+      description: "one\r\ntwo\rthree\nfour",
+      date: "2026-10-16",
+      time: "19:00",
+      timeZone: "America/Los_Angeles",
+      uid: "u@nearby",
+      now: new Date("2026-10-14T16:00:00.000Z"),
+    });
+    expect(withBreaks).toContain(String.raw`DESCRIPTION:one\ntwo\nthree\nfour`);
+  });
+
   it("defines the time zone it references", () => {
     expect(ics).toContain("BEGIN:VTIMEZONE\r\nTZID:America/Los_Angeles");
   });
