@@ -139,8 +139,7 @@ export function toLocalDayMinute(date: Date, timeZone: string): { day: DayOfWeek
   return { day: dayIndex(part("weekday")), minute: Number(part("hour")) * 60 + Number(part("minute")) };
 }
 
-/** "Daily", "Tue", or a range like "Tue–Sun" -> the days it covers. */
-export function parseDays(spec: string): DayOfWeek[] {
+function parseDays(spec: string): DayOfWeek[] {
   if (spec === "Daily") return ALL_DAYS;
   const [start, end = start] = spec.split("–").map(dayIndex);
   const days: DayOfWeek[] = [start];
