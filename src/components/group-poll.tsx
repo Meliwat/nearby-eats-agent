@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import type { StoredAgentEvent } from "@/agent/events";
 import type { PollView } from "@/agent/polls";
 
 const REFRESH_MS = 5000;
@@ -173,6 +174,14 @@ export function PollCard({ pollId }: { pollId: string }) {
       )}
     </div>
   );
+}
+
+/** The poll created in a turn, if the agent started one. */
+export function pollIdFor(events: StoredAgentEvent[]): string | null {
+  const created = events.find(
+    (event) => event.type === "tool_call" && event.payload.name === "start_group_poll" && !event.payload.isError,
+  );
+  return created?.type === "tool_call" ? (created.payload.output as { poll_id: string }).poll_id : null;
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

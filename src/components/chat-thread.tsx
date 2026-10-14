@@ -4,12 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import type { StoredAgentEvent } from "@/agent/events";
 import type { ChatMessage } from "./chat-app";
 import { ActivityIndicator, type Activity } from "./activity-indicator";
-import { PollCard } from "./group-poll";
+import { PollCard, pollIdFor } from "./group-poll";
+import { Bubble, StreamingBubble } from "./message-bubble";
 import { RecommendationCard, recommendationFor } from "./recommendation-card";
-
-/** Typewriter pacing: at least ~120 characters a second, and never more than ~20 frames behind. */
-const MIN_CHARS_PER_FRAME = 2;
-const CATCH_UP_FRAMES = 20;
 
 const STARTERS = [
   "Where should I eat tonight?",
@@ -78,6 +75,7 @@ export function ChatThread({
         )}
 
         {messages.map((message, index) => {
+          // Events are keyed by the user message that started the turn, which sits just before its reply.
           const turnEvents = message.role === "assistant" ? (eventsByTurn[messages[index - 1]?.id] ?? []) : [];
           const recommendation = recommendationFor(turnEvents);
           const pollId = pollIdFor(turnEvents);
@@ -120,64 +118,4 @@ export function ChatThread({
       </form>
     </>
   );
-}
-
-function Bubble({ role, text, children }: { role: "user" | "assistant"; text: string; children?: React.ReactNode }) {
-  const mine = role === "user";
-  return (
-    <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-      <p
-        className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
-          mine ? "rounded-br-sm bg-emerald-600 text-white" : "rounded-bl-sm bg-white shadow-sm dark:bg-stone-900"
-        }`}
-      >
-        {text}
-        {children}
-      </p>
-    </div>
-  );
-}
-
-/** The reply arriving: revealed with a typewriter so a burst of text reads as it streams. */
-function StreamingBubble({ text, finished, onRevealed }: { text: string; finished: boolean; onRevealed: () => void }) {
-  const shown = useTypewriter(text);
-  const revealed = shown.length === text.length;
-
-  useEffect(() => {
-    if (finished && revealed) onRevealed();
-  }, [finished, revealed, onRevealed]);
-
-  return (
-    <Bubble role="assistant" text={shown}>
-      {!revealed || !finished ? <span className="caret ml-0.5 text-emerald-600">▍</span> : null}
-    </Bubble>
-  );
-}
-
-/**
- * Reveals `target` a few characters per animation frame, faster the further behind it is, so
- * the model's replies (which arrive in one fast burst after its tool calls) read as they stream.
- */
-function useTypewriter(target: string): string {
-  const [length, setLength] = useState(0);
-  const reduceMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  useEffect(() => {
-    if (reduceMotion || length >= target.length) return;
-    const frame = requestAnimationFrame(() => {
-      const remaining = target.length - length;
-      setLength(length + Math.max(MIN_CHARS_PER_FRAME, Math.ceil(remaining / CATCH_UP_FRAMES)));
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [length, target, reduceMotion]);
-
-  return reduceMotion ? target : target.slice(0, length);
-}
-
-/** The poll created in a turn, if the agent started one. */
-function pollIdFor(events: StoredAgentEvent[]): string | null {
-  const created = events.find(
-    (event) => event.type === "tool_call" && event.payload.name === "start_group_poll" && !event.payload.isError,
-  );
-  return created?.type === "tool_call" ? (created.payload.output as { poll_id: string }).poll_id : null;
 }
