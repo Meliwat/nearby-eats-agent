@@ -92,7 +92,10 @@ export function rejectCrossSite(request: Request): Response | null {
   return null;
 }
 
-/** Request bodies here are a short message or a vote; anything bigger is refused before parsing. */
+/**
+ * Request bodies here are a short message or a vote. A declared Content-Length over this is refused
+ * before parsing; a chunked body without one is parsed, and the request schemas cap each field.
+ */
 const MAX_BODY_BYTES = 16_000;
 
 export function rejectLargeBody(request: Request): Response | null {

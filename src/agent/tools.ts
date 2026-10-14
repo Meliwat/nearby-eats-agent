@@ -416,8 +416,6 @@ function describeForModel(r: CatalogRestaurant) {
   };
 }
 
-/** Minutes after midnight as 24-hour "HH:MM", the same format search_restaurants takes. */
-
 function failure(message: string): ToolOutcome {
   return { output: { error: message }, isError: true, factChanges: [] };
 }

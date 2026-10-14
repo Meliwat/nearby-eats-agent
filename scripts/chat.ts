@@ -2,6 +2,7 @@
  * Plays a scripted conversation against the real agent and prints what it did.
  * Usage: pnpm chat "where should I eat tonight" "vegetarian, with 2 kids"
  */
+import { eq } from "drizzle-orm";
 import { db } from "../src/db/client";
 import { conversations, users } from "../src/db/schema";
 import type { StreamMessage } from "../src/agent/events";
@@ -26,10 +27,15 @@ async function main() {
   if (turns.length === 0) throw new Error('Pass at least one message, e.g. pnpm chat "where should I eat tonight"');
 
   const [user] = await db.insert(users).values({}).returning();
-  const [conversation] = await db.insert(conversations).values({ userId: user.id }).returning();
-  for (const text of turns) {
-    console.log(`You: ${text}`);
-    await runTurn({ userId: user.id, conversationId: conversation.id, text }, print);
+  try {
+    const [conversation] = await db.insert(conversations).values({ userId: user.id }).returning();
+    for (const text of turns) {
+      console.log(`You: ${text}`);
+      await runTurn({ userId: user.id, conversationId: conversation.id, text }, print);
+    }
+  } finally {
+    // A throwaway user; deleting it cascades to the conversation and everything logged in it.
+    await db.delete(users).where(eq(users.id, user.id));
   }
 }
 
