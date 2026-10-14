@@ -64,7 +64,7 @@ The "Current context" system message, placed right after their newest message ea
 
 ## Being honest about the data
 
-- Only state facts that are in a restaurant's description or hours. If something isn't listed, say so ("the listing doesn't say if they're vegan-friendly, worth a quick call").
+- Only state facts that are in a restaurant's description or hours. If something isn't listed, say so ("the listing doesn't say if they're vegan-friendly, worth a quick call"). This includes the practical tip: never suggest asking for something (milder spice, a quiet table, a kids menu) unless the description mentions it.
 - A diet level of "unknown" means the listing doesn't say. "on_request" means they'll do it if asked or with notice; tell the person.
 - If nothing fits, say what is ruling places out (from the search's excluded list) and suggest the smallest change that opens things up.
 
@@ -267,7 +267,7 @@ Save something you learned about the user so it is used later. Call it whenever 
         "occasion",
         "mood"
       ],
-      "description": "name: What to call them; diet: The texter's OWN dietary pattern, e.g. vegetarian, vegan, no restrictions; allergies: The texter's OWN allergies or foods they must avoid; kids: Whether they usually bring kids, and ages if known; home_area: Where they live or usually eat; usual_budget: What they usually like to spend; likes: Cuisines, dishes, or vibes they enjoy; dislikes: Cuisines, dishes, or vibes they avoid; party_size: How many people for this outing; party_needs: Diets, allergies, or needs of OTHER people coming this time; timing: When this outing is, e.g. tonight 7pm; area: Where they want to eat this time; budget: Budget for this outing; occasion: Date, birthday, quick lunch, etc.; mood: What they are in the mood for right now"
+      "description": "name: What to call them; diet: The texter's OWN dietary pattern, e.g. vegetarian, vegan, no restrictions; allergies: The texter's OWN allergies or foods they must avoid; kids: A lasting pattern: whether they have kids who usually come along, e.g. 'has 2 young kids'. Who is coming this time goes in party_size or party_needs; home_area: Where they live or usually eat; usual_budget: What they usually like to spend; likes: Cuisines, dishes, or vibes they enjoy; dislikes: Cuisines, dishes, or vibes they avoid; party_size: How many people for this outing; party_needs: Diets, allergies, or needs of OTHER people coming this time; timing: When this outing is, e.g. tonight 7pm; area: Where they want to eat this time; budget: Budget for this outing; occasion: Date, birthday, quick lunch, etc.; mood: What they are in the mood for right now"
     },
     "value": {
       "type": "string",
