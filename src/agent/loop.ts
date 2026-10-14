@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db/client";
-import { agentEvents, messages } from "@/db/schema";
+import { inArray } from "drizzle-orm";
+import { agentEvents, groupPolls, messages, recommendations } from "@/db/schema";
 import { loadCatalog } from "@/lib/restaurants/load-catalog";
 import { buildContextMessage, loadCarriedConstraints, loadRecommendations, loadTranscript, SYSTEM_PROMPT } from "./context";
 import { agentEventSchema, type AgentEvent, type StreamMessage } from "./events";
@@ -59,6 +60,7 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
 
   const turnStarted = Date.now();
   let replyStored = false;
+  const madeThisTurn = { recommendationIds: [] as string[], pollIds: [] as string[] };
   try {
     const now = new Date();
     const [catalog, transcript, facts, recs, polls, readPollNotesEarlier, carriedConstraints] = await Promise.all([
@@ -79,6 +81,7 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
       catalog,
       rejectedIds: new Set(recs.filter((r) => r.status === "rejected").map((r) => r.restaurantId)),
       readThirdPartyText: false,
+      madeThisTurn,
       conversationReadThirdPartyText: readPollNotesEarlier,
       constraints: carriedConstraints,
       lastSearch: null,
@@ -121,6 +124,7 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
 
       if (message.stop_reason === "refusal") {
         reply = REFUSAL_REPLY;
+        await discardTurnPicks(madeThisTurn);
         break;
       }
 
@@ -141,8 +145,9 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
 
     // An empty assistant message would make every later request in this conversation fail.
     if (!reply.trim()) {
-      await record({ type: "error", durationMs: null, payload: { stage: "loop", message: "Model returned no text; sent a fallback reply" } });
+      await record({ type: "error", durationMs: null, payload: { stage: "fallback", message: "Model returned no text; sent a stock reply" } });
       reply = FALLBACK_REPLY;
+      await discardTurnPicks(madeThisTurn);
     }
 
     const [assistantMessage] = await db
@@ -159,6 +164,7 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
     await record({ type: "error", durationMs: null, payload: { stage: "turn", message: describeError(error) } }).catch(() => {
       // The database itself may be what failed; the stream error below still reaches the user.
     });
+    await discardTurnPicks(madeThisTurn).catch(() => {});
     // Keep the transcript alternating user/assistant, so the next turn isn't answering two messages at once.
     if (!replyStored) {
       await db
@@ -169,6 +175,17 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
     emit({ kind: "error", message: FAILURE_REPLY });
     throw error;
   }
+}
+
+/**
+ * Picks and polls from a turn that ended in a refusal, a stock reply, or a failure were never shown
+ * (their cards are hidden), so they're removed instead of counting as suggestions next turn.
+ */
+async function discardTurnPicks(made: { recommendationIds: string[]; pollIds: string[] }): Promise<void> {
+  await Promise.all([
+    made.recommendationIds.length > 0 && db.delete(recommendations).where(inArray(recommendations.id, made.recommendationIds)),
+    made.pollIds.length > 0 && db.delete(groupPolls).where(inArray(groupPolls.id, made.pollIds)),
+  ]);
 }
 
 /** One streamed model call. With `mustAnswer`, tools are withheld so the model has to reply in words. */

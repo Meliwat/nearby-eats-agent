@@ -43,6 +43,7 @@ function context(overrides: Partial<ToolContext> = {}): ToolContext {
     readThirdPartyText: false,
     conversationReadThirdPartyText: false,
     constraints: NO_CONSTRAINTS,
+    madeThisTurn: { recommendationIds: [], pollIds: [] },
     lastSearch: null,
     ...overrides,
   };

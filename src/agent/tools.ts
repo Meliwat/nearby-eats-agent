@@ -40,6 +40,8 @@ export interface ToolContext {
   conversationReadThirdPartyText: boolean;
   /** Hard constraints the conversation's searches have applied so far; later searches keep them (see constraints.ts). */
   constraints: AppliedConstraints;
+  /** Picks and polls created this turn, discarded if the turn doesn't end in a real reply. */
+  madeThisTurn: { recommendationIds: string[]; pollIds: string[] };
   /** The most recent search this turn; recommend_restaurant must pick one of its candidates. */
   lastSearch: (SearchResult & { arrival: SearchFilters["arrival"] }) | null;
 }
@@ -303,11 +305,11 @@ async function runRecommend(input: ToolInput<"recommend_restaurant">, ctx: ToolC
     return failure(`Restaurant ${input.restaurant_id} is not a candidate (${why}). Pick from the latest candidates.`);
   }
 
-  await db.insert(recommendations).values({
-    conversationId: ctx.conversationId,
-    restaurantId: candidate.id,
-    reason: input.reason,
-  });
+  const [saved] = await db
+    .insert(recommendations)
+    .values({ conversationId: ctx.conversationId, restaurantId: candidate.id, reason: input.reason })
+    .returning({ id: recommendations.id });
+  ctx.madeThisTurn.recommendationIds.push(saved.id);
   // The visit the search was checked against, so the UI can offer directions, a calendar event, and a closing time.
   const { day, minute, daysFromToday } = ctx.lastSearch.arrival;
   const closeMinute = closingMinuteAt(candidate.hours, day, minute);
@@ -374,6 +376,7 @@ async function runStartGroupPoll(input: ToolInput<"start_group_poll">, ctx: Tool
     ctx.conversationId,
     input.options.map((option) => ({ restaurantId: option.restaurant_id, reason: option.reason })),
   );
+  ctx.madeThisTurn.pollIds.push(pollId);
   return {
     isError: false,
     factChanges: [],

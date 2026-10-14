@@ -31,8 +31,11 @@ export const factChangePayload = z.object({
 });
 
 export const errorPayload = z.object({
-  /** "loop": a recoverable problem inside a turn (it still replies). "turn": the turn failed. */
-  stage: z.enum(["loop", "turn"]),
+  /**
+   * "loop": a recoverable note inside a turn (it still replies). "fallback": the model gave no
+   * text, so a stock reply was sent. "turn": the turn failed.
+   */
+  stage: z.enum(["loop", "fallback", "turn"]),
   message: z.string(),
 });
 
