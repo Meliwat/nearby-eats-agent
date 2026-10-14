@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { StoredAgentEvent } from "@/agent/events";
 import type { PollView } from "@/agent/polls";
+import { turnEndedBadly } from "./turn-outcome";
 
 const REFRESH_MS = 5000;
 const NAME_STORAGE_KEY = "nearby_voter_name";
@@ -191,6 +192,7 @@ export function PollCard({ pollId }: { pollId: string }) {
 
 /** The poll created in a turn, if the agent started one. */
 export function pollIdFor(events: StoredAgentEvent[]): string | null {
+  if (turnEndedBadly(events)) return null;
   const created = events.find(
     (event) => event.type === "tool_call" && event.payload.name === "start_group_poll" && !event.payload.isError,
   );

@@ -3,6 +3,7 @@
 import type { StoredAgentEvent } from "@/agent/events";
 import { buildVisitIcs } from "@/lib/calendar";
 import { clockToMinute, formatMinute, localDateAfter, RESTAURANT_TIME_ZONE, toLocalDayMinute } from "@/lib/restaurants/hours";
+import { turnEndedBadly } from "./turn-outcome";
 
 interface Recommendation {
   recommended: string;
@@ -105,16 +106,11 @@ function closesIn(visit: Visit): string | null {
 
 
 /**
- * The latest successful recommend_restaurant call in a turn, if the agent made one. No card for a
- * turn that ended in a refusal or a failure: its reply is an apology, not the pick.
+ * The latest successful recommend_restaurant call in a turn, if the agent made one, unless the turn
+ * ended badly (see turnEndedBadly).
  */
 export function recommendationFor(events: StoredAgentEvent[]): Recommendation | null {
-  const endedBadly = events.some(
-    (event) =>
-      (event.type === "error" && event.payload.stage === "turn") ||
-      (event.type === "model_call" && event.payload.stopReason === "refusal"),
-  );
-  if (endedBadly) return null;
+  if (turnEndedBadly(events)) return null;
   const call = events.findLast(
     (event) => event.type === "tool_call" && event.payload.name === "recommend_restaurant" && !event.payload.isError,
   );

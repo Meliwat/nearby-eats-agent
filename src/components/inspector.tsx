@@ -113,8 +113,8 @@ function EventRow({ event }: { event: StoredAgentEvent }) {
       );
     }
     case "error":
-      // "loop" events are recoverable (the turn still replied), so they read as notes, not failures.
-      return event.payload.stage === "loop" ? (
+      // Only "turn" events are failures; the rest are recoverable (the turn still replied), so they read as notes.
+      return event.payload.stage !== "turn" ? (
         <li className="rounded-md bg-stone-100 px-2 py-1 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300">
           note: {event.payload.message}
         </li>
