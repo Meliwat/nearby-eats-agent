@@ -11,7 +11,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
-    "chat": "tsx --env-file=.env.local scripts/chat.ts"
+    "chat": "tsx --env-file=.env.local scripts/chat.ts",
+    "eval": "tsx --env-file=.env.local scripts/eval.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.133.0",
