@@ -115,6 +115,7 @@ export function ChatApp() {
           const body = (await response.json().catch(() => null)) as { error?: string } | null;
           return failTurn(body?.error ?? `Something went wrong (${response.status}). Try again?`);
         }
+        // Mutable on purpose: turn_started swaps in the saved user message id, and later events are grouped under it.
         const turn = { id: PENDING_USER_ID };
         let finished = false;
         for await (const line of readLines(response.body)) {
