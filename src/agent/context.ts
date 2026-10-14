@@ -5,7 +5,8 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { agentEvents, messages, recommendations, restaurants } from "@/db/schema";
 import type { ActiveFact } from "./facts";
-import { buildActionNote, type ToolCallPayload } from "./tool-summary";
+import type { ToolCallPayload } from "./tool-summary";
+import { trimTranscript, withActionNotes } from "./transcript";
 import { RESTAURANT_TIME_ZONE as TIME_ZONE } from "@/lib/restaurants/hours";
 
 /** Read once per server instance. next.config.ts includes prompts/ in the deployed function. */
@@ -26,9 +27,7 @@ export async function loadTranscript(conversationId: string): Promise<Anthropic.
     .where(eq(messages.conversationId, conversationId))
     .orderBy(desc(messages.createdAt))
     .limit(MAX_TRANSCRIPT_MESSAGES);
-  const recent = rows.reverse().filter((row) => row.content.trim());
-  const firstUser = recent.findIndex((row) => row.role === "user");
-  const transcript = recent.slice(Math.max(firstUser, 0));
+  const transcript = trimTranscript(rows);
 
   const userIds = transcript.filter((row) => row.role === "user").map((row) => row.id);
   const toolCalls = userIds.length
@@ -39,16 +38,10 @@ export async function loadTranscript(conversationId: string): Promise<Anthropic.
         .orderBy(asc(agentEvents.id))
     : [];
 
-  return transcript.flatMap((row, index): Anthropic.Beta.BetaMessageParam[] => {
-    const previous = transcript[index - 1];
-    if (row.role === "assistant" && previous?.role === "user") {
-      const calls = toolCalls.filter((c) => c.turnMessageId === previous.id).map((c) => c.payload as ToolCallPayload);
-      const note = buildActionNote(calls);
-      // A mid-conversation system note must sit between a user message and an assistant reply, as here.
-      if (note) return [{ role: "system", content: note }, { role: "assistant", content: row.content }];
-    }
-    return [{ role: row.role, content: row.content }];
-  });
+  return withActionNotes(
+    transcript,
+    toolCalls.map((call) => ({ turnMessageId: call.turnMessageId, payload: call.payload as ToolCallPayload })),
+  );
 }
 
 export interface RecommendationSummary {
