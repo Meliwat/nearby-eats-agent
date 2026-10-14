@@ -29,6 +29,13 @@
       "when": 1791996455687,
       "tag": "0003_scope_fact_uniqueness",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792000943598,
+      "tag": "0004_event_turn_index_and_fact_links",
+      "breakpoints": true
     }
   ]
 }

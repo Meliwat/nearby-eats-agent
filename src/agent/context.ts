@@ -35,7 +35,13 @@ export async function loadTranscript(conversationId: string): Promise<Anthropic.
     ? await db
         .select({ turnMessageId: agentEvents.turnMessageId, payload: agentEvents.payload })
         .from(agentEvents)
-        .where(and(inArray(agentEvents.turnMessageId, userIds), eq(agentEvents.type, "tool_call")))
+        .where(
+          and(
+            eq(agentEvents.conversationId, conversationId),
+            inArray(agentEvents.turnMessageId, userIds),
+            eq(agentEvents.type, "tool_call"),
+          ),
+        )
         .orderBy(asc(agentEvents.id))
     : [];
 

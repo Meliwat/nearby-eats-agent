@@ -144,7 +144,7 @@ export const userFacts = pgTable(
     scope: factScope().notNull(),
     status: factStatus().notNull().default("active"),
     // The fact this one replaced, if any. Points backward so the old row already exists.
-    supersedes: uuid().references((): AnyPgColumn => userFacts.id),
+    supersedes: uuid().references((): AnyPgColumn => userFacts.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -185,7 +185,11 @@ export const agentEvents = pgTable(
     durationMs: integer(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("agent_events_conversation_idx").on(table.conversationId, table.id)],
+  (table) => [
+    index("agent_events_conversation_idx").on(table.conversationId, table.id),
+    // Rebuilding a transcript looks up tool calls by turn, and deleting a message cascades by it.
+    index("agent_events_turn_idx").on(table.turnMessageId),
+  ],
 );
 
 export const recommendationStatus = pgEnum("recommendation_status", ["suggested", "accepted", "rejected"]);
