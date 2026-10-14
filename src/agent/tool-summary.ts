@@ -8,7 +8,7 @@ export function summarizeToolCall(payload: ToolCallPayload): string {
   if (payload.isError) return `failed: ${String(output.error)}`;
   switch (payload.name) {
     case "search_restaurants":
-      return `${output.arrival} [${describeSearch(output)}]: ${output.candidate_count} fit, ${(output.excluded as unknown[]).length} ruled out`;
+      return `${output.arrival} [${describeSearch(output, payload.input)}]: ${output.candidate_count} fit, ${(output.excluded as unknown[]).length} ruled out`;
     case "recommend_restaurant":
       return `picked ${output.recommended}`;
     case "remember_fact":
@@ -41,9 +41,12 @@ export function buildActionNote(calls: ToolCallPayload[]): string | null {
   return ["Your tool calls before this reply (from the system log; the user doesn't see this):", ...lines].join("\n");
 }
 
-/** The constraints a search applied (including ones carried from earlier searches), and any it dropped. */
-function describeSearch(output: Record<string, unknown>): string {
-  const applied = output.applied_constraints as
+/**
+ * The constraints a search applied (including ones carried from earlier searches), and any it
+ * dropped. Searches logged before applied_constraints existed fall back to what the model asked for.
+ */
+function describeSearch(output: Record<string, unknown>, input: unknown): string {
+  const applied = (output.applied_constraints ?? input) as
     | { diets: string[]; with_kids: boolean; party_size: number | null; max_price_tier: number | null; avoid_cash_only: boolean }
     | undefined;
   const parts = applied

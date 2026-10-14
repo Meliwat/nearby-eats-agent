@@ -117,7 +117,8 @@ export async function loadCarriedConstraints(conversationId: string): Promise<Ap
     )
     .orderBy(desc(agentEvents.id))
     .limit(1);
-  const output = (latest?.payload as { output?: { applied_constraints?: unknown } } | undefined)?.output;
-  const parsed = appliedConstraintsSchema.safeParse(output?.applied_constraints);
+  const payload = latest?.payload as { input?: unknown; output?: { applied_constraints?: unknown } } | undefined;
+  // Searches logged before applied_constraints existed carry what the model asked for instead.
+  const parsed = appliedConstraintsSchema.safeParse(payload?.output?.applied_constraints ?? payload?.input);
   return parsed.success ? parsed.data : NO_CONSTRAINTS;
 }

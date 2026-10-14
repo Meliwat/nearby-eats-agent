@@ -41,6 +41,11 @@ describe("summarizeToolCall", () => {
     expect(summarizeToolCall(call("get_poll_results", { options: [{ name: "Casa Verde", votes: 2 }] }))).toBe("Casa Verde 2");
   });
 
+  it("falls back to the model's input for searches logged before applied constraints", () => {
+    const old = { ...search, input: { diets: ["vegan"], with_kids: false }, output: { arrival: "Fri 7pm", candidate_count: 3, excluded: [] } };
+    expect(summarizeToolCall(old)).toBe("Fri 7pm [vegan]: 3 fit, 0 ruled out");
+  });
+
   it("shows constraints the search dropped", () => {
     const withDrop = { ...search, output: { ...(search.output as object), dropped: ["kids"] } };
     expect(summarizeToolCall(withDrop)).toContain("; dropped kids]");
