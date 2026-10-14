@@ -20,6 +20,7 @@ const TURN_BUDGET_MS = 40_000;
 
 const FALLBACK_REPLY = "Sorry, I lost my train of thought there. What are you in the mood for?";
 const FAILURE_REPLY = "Sorry, something went wrong on my end. Try that again?";
+const REFUSAL_REPLY = "Sorry, I can't help with that one. Want a restaurant pick instead?";
 
 const client = new Anthropic();
 
@@ -113,7 +114,7 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
       });
 
       if (message.stop_reason === "refusal") {
-        reply = "Sorry, I can't help with that one. Want a restaurant pick instead?";
+        reply = REFUSAL_REPLY;
         break;
       }
 
@@ -134,11 +135,11 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
       reply = FALLBACK_REPLY;
     }
 
-    const [assistantMessage] = await db
-      .insert(messages)
-      .values({ conversationId, role: "assistant", content: reply })
-      .returning({ id: messages.id });
-    emit({ kind: "context", facts: await loadActiveFacts(userId, conversationId) });
+    const [[assistantMessage], factsAfterTurn] = await Promise.all([
+      db.insert(messages).values({ conversationId, role: "assistant", content: reply }).returning({ id: messages.id }),
+      loadActiveFacts(userId, conversationId),
+    ]);
+    emit({ kind: "context", facts: factsAfterTurn });
     emit({ kind: "done", assistantMessageId: assistantMessage.id, text: reply });
   } catch (error) {
     // Full details go to server logs only; the stored event (which the inspector shows) says what kind of failure it was.
