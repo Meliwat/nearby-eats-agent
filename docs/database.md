@@ -118,7 +118,9 @@ turn rebuilds the model's context from three tables:
 
 `agent_events` is the observability log: every model call (tokens, latency, stop reason), tool
 call (input, output, error flag), and fact change, tied to the user message that caused it. The
-inspector panel renders it, and it is never replayed to the model.
+inspector panel renders it. It also gives the model memory of its own actions: before each past
+reply, the rebuilt transcript includes a one-line-per-call summary of that turn's tool calls
+(never the full results), so the model knows its earlier picks were searched and verified.
 
 ## Invariants the database enforces
 

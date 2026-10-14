@@ -8,7 +8,9 @@ Model: `claude-sonnet-5-5` at low effort, adaptive thinking, up to 8 model calls
 ## How a request is assembled
 
 1. **System prompt** (below), identical every turn so it stays cached.
-2. **Transcript**: the visible user and assistant messages of this conversation, from the database.
+2. **Transcript**: the last 30 visible user and assistant messages of this conversation, from the
+   database. Before each past reply, a short system note lists that turn's tool calls (from
+   `agent_events`), so the model remembers what it did, not just what it said.
 3. **Current context**: a mid-conversation system message right after the newest user message,
    rebuilt every turn from the database (example below).
 4. **Tools**: the definitions below, with strict schemas. Inputs are also validated with Zod
@@ -203,7 +205,7 @@ Look up one restaurant by name, e.g. when the user asks about a specific place.
   "properties": {
     "name": {
       "type": "string",
-      "description": "Restaurant name, or part of it"
+      "description": "Restaurant name, or at least 3 letters of it"
     }
   },
   "required": [
@@ -244,7 +246,7 @@ Save something you learned about the user so it is used later. Call it whenever 
     },
     "value": {
       "type": "string",
-      "description": "Short normalized value, e.g. \"vegetarian\" or \"4 people\""
+      "description": "Short normalized value, e.g. \"vegetarian\" or \"4 people\" (at most 100 characters)"
     }
   },
   "required": [

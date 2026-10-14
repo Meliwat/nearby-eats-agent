@@ -36,7 +36,9 @@ Model: \`${MODEL}\` at low effort, adaptive thinking, up to 8 model calls per us
 ## How a request is assembled
 
 1. **System prompt** (below), identical every turn so it stays cached.
-2. **Transcript**: the visible user and assistant messages of this conversation, from the database.
+2. **Transcript**: the last 30 visible user and assistant messages of this conversation, from the
+   database. Before each past reply, a short system note lists that turn's tool calls (from
+   \`agent_events\`), so the model remembers what it did, not just what it said.
 3. **Current context**: a mid-conversation system message right after the newest user message,
    rebuilt every turn from the database (example below).
 4. **Tools**: the definitions below, with strict schemas. Inputs are also validated with Zod
