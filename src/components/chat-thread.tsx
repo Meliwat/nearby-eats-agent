@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { StoredAgentEvent } from "@/agent/events";
 import type { ChatMessage } from "./chat-app";
+import { PollCard } from "./group-poll";
 
 const STARTERS = [
   "Where should I eat tonight?",
@@ -64,12 +65,14 @@ export function ChatThread({ messages, eventsByTurn, draft, error, busy, onSend 
         )}
 
         {messages.map((message, index) => {
-          const recommendation =
-            message.role === "assistant" ? recommendationFor(eventsByTurn[messages[index - 1]?.id] ?? []) : null;
+          const turnEvents = message.role === "assistant" ? (eventsByTurn[messages[index - 1]?.id] ?? []) : [];
+          const recommendation = recommendationFor(turnEvents);
+          const pollId = pollIdFor(turnEvents);
           return (
             <div key={message.id} className="space-y-2">
               <Bubble role={message.role} text={message.content} />
               {recommendation && <RecommendationCard recommendation={recommendation} />}
+              {pollId && <PollCard pollId={pollId} />}
             </div>
           );
         })}
@@ -140,4 +143,12 @@ function recommendationFor(events: StoredAgentEvent[]): Recommendation | null {
     }
   }
   return null;
+}
+
+/** The poll created in a turn, if the agent started one. */
+function pollIdFor(events: StoredAgentEvent[]): string | null {
+  const created = events.find(
+    (event) => event.type === "tool_call" && event.payload.name === "start_group_poll" && !event.payload.isError,
+  );
+  return created?.type === "tool_call" ? (created.payload.output as { poll_id: string }).poll_id : null;
 }

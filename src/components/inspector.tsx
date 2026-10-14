@@ -136,6 +136,10 @@ function summarizeToolCall(payload: Extract<StoredAgentEvent, { type: "tool_call
       return `${output.status}`;
     case "get_restaurant":
       return `${(output as unknown as unknown[]).length} match(es)`;
+    case "start_group_poll":
+      return `poll: ${(output.options as string[]).join(" / ")}`;
+    case "get_poll_results":
+      return (output.options as { name: string; votes: number }[]).map((o) => `${o.name} ${o.votes}`).join(", ");
     default:
       return "";
   }

@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -201,4 +202,62 @@ export const recommendations = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("recommendations_conversation_idx").on(table.conversationId)],
+);
+
+// ---------------------------------------------------------------------------
+// Group pick: the agent proposes 2-3 places, friends vote from a shared link.
+// ---------------------------------------------------------------------------
+
+export const groupPolls = pgTable(
+  "group_polls",
+  {
+    // Random and unguessable: the share link is the only way in.
+    id: uuid().primaryKey().defaultRandom(),
+    conversationId: uuid()
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("group_polls_conversation_idx").on(table.conversationId)],
+);
+
+export const groupPollOptions = pgTable(
+  "group_poll_options",
+  {
+    pollId: uuid()
+      .notNull()
+      .references(() => groupPolls.id, { onDelete: "cascade" }),
+    restaurantId: integer()
+      .notNull()
+      .references(() => restaurants.id),
+    position: smallint().notNull(),
+    reason: text().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.pollId, table.restaurantId] })],
+);
+
+/** One vote per person per poll; voting again changes it. */
+export const groupVotes = pgTable(
+  "group_votes",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    pollId: uuid().notNull(),
+    restaurantId: integer().notNull(),
+    // The voter's anonymous user (same cookie as chat), so a refresh can't double-vote.
+    voterId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    voterName: text().notNull(),
+    note: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("group_votes_one_per_voter").on(table.pollId, table.voterId),
+    // A vote can only be for an option that is actually in this poll.
+    foreignKey({
+      name: "group_votes_option_fk",
+      columns: [table.pollId, table.restaurantId],
+      foreignColumns: [groupPollOptions.pollId, groupPollOptions.restaurantId],
+    }).onDelete("cascade"),
+  ],
 );

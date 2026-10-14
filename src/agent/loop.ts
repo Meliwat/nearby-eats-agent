@@ -5,6 +5,7 @@ import { loadCatalog } from "@/lib/restaurants/load-catalog";
 import { buildContextMessage, loadRecommendations, loadTranscript, SYSTEM_PROMPT } from "./context";
 import { agentEventSchema, type AgentEvent, type StreamMessage } from "./events";
 import { loadActiveFacts } from "./facts";
+import { summarizePolls } from "./polls";
 import { buildTools, executeTool, type ToolContext } from "./tools";
 
 export const MODEL = "claude-sonnet-5-5";
@@ -46,11 +47,12 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
 
   try {
     const now = new Date();
-    const [catalog, transcript, facts, recs] = await Promise.all([
+    const [catalog, transcript, facts, recs, polls] = await Promise.all([
       loadCatalog(),
       loadTranscript(conversationId),
       loadActiveFacts(userId, conversationId),
       loadRecommendations(conversationId),
+      summarizePolls(conversationId),
     ]);
     const { definitions, schemas } = buildTools(catalog);
     const ctx: ToolContext = {
@@ -66,7 +68,7 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
     // Append-only within the turn: the model's own content blocks go back exactly as received.
     const conversation: Anthropic.Beta.BetaMessageParam[] = [
       ...transcript,
-      { role: "system", content: buildContextMessage(now, facts, recs) },
+      { role: "system", content: buildContextMessage(now, facts, recs, polls) },
     ];
 
     let reply = "";

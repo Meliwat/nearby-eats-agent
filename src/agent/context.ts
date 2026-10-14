@@ -40,7 +40,12 @@ export async function loadRecommendations(conversationId: string): Promise<Recom
  * user's newest message. Keeping volatile state here (not in SYSTEM_PROMPT) keeps the
  * system prompt byte-identical across turns, so it stays cached.
  */
-export function buildContextMessage(now: Date, facts: ActiveFact[], recs: RecommendationSummary[]): string {
+export function buildContextMessage(
+  now: Date,
+  facts: ActiveFact[],
+  recs: RecommendationSummary[],
+  polls: string[],
+): string {
   const localTime = now.toLocaleString("en-US", {
     timeZone: TIME_ZONE,
     weekday: "long",
@@ -61,5 +66,7 @@ export function buildContextMessage(now: Date, facts: ActiveFact[], recs: Recomm
     ...factLines,
     "Recommendations so far in this conversation:",
     ...recLines,
+    "Group polls in this conversation (votes per option):",
+    ...(polls.length ? polls.map((p) => `- ${p}`) : ["- none"]),
   ].join("\n");
 }
