@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { DAY_NAMES, type DayOfWeek } from "./hours";
+import { DAY_NAMES, parseDays, type DayOfWeek } from "./hours";
 import { parseRestaurantFile } from "./parse-source";
 
 const sourceText = readFileSync(new URL("../../../data/restaurants.txt", import.meta.url), "utf8");
@@ -42,12 +42,6 @@ describe("parseRestaurantFile", () => {
 function parseClosedNote(hoursText: string): Set<DayOfWeek> {
   const match = /Closed (\w{3})\w*(?:–(\w{3}))?/.exec(hoursText);
   if (!match) return new Set();
-  const start = DAY_NAMES.indexOf(match[1] as (typeof DAY_NAMES)[number]);
-  const end = match[2] ? DAY_NAMES.indexOf(match[2] as (typeof DAY_NAMES)[number]) : start;
-  const days = new Set<DayOfWeek>([start as DayOfWeek]);
-  for (let day = start; day !== end; ) {
-    day = (day + 1) % 7;
-    days.add(day as DayOfWeek);
-  }
-  return days;
+  const [, start, end] = match;
+  return new Set(parseDays(end ? `${start}–${end}` : start));
 }
