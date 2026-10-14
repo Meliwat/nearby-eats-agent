@@ -32,32 +32,34 @@ export async function createPoll(conversationId: string, options: { restaurantId
 
 /** The public view of a poll: options, reasons, and who voted for what. No conversation content. */
 export async function getPollView(pollId: string, viewerId: string | null): Promise<PollView | null> {
-  const options = await db
-    .select({
-      restaurantId: groupPollOptions.restaurantId,
-      reason: groupPollOptions.reason,
-      name: restaurants.name,
-      city: restaurants.city,
-      priceTier: restaurants.priceTier,
-      address: restaurants.address,
-      hours: restaurants.hoursText,
-    })
-    .from(groupPollOptions)
-    .innerJoin(restaurants, eq(restaurants.id, groupPollOptions.restaurantId))
-    .where(eq(groupPollOptions.pollId, pollId))
-    .orderBy(asc(groupPollOptions.position));
+  // Neither query depends on the other, so they run concurrently instead of back to back.
+  const [options, votes] = await Promise.all([
+    db
+      .select({
+        restaurantId: groupPollOptions.restaurantId,
+        reason: groupPollOptions.reason,
+        name: restaurants.name,
+        city: restaurants.city,
+        priceTier: restaurants.priceTier,
+        address: restaurants.address,
+        hours: restaurants.hoursText,
+      })
+      .from(groupPollOptions)
+      .innerJoin(restaurants, eq(restaurants.id, groupPollOptions.restaurantId))
+      .where(eq(groupPollOptions.pollId, pollId))
+      .orderBy(asc(groupPollOptions.position)),
+    db
+      .select({
+        restaurantId: groupVotes.restaurantId,
+        voterId: groupVotes.voterId,
+        name: groupVotes.voterName,
+        note: groupVotes.note,
+      })
+      .from(groupVotes)
+      .where(eq(groupVotes.pollId, pollId))
+      .orderBy(asc(groupVotes.createdAt)),
+  ]);
   if (options.length === 0) return null;
-
-  const votes = await db
-    .select({
-      restaurantId: groupVotes.restaurantId,
-      voterId: groupVotes.voterId,
-      name: groupVotes.voterName,
-      note: groupVotes.note,
-    })
-    .from(groupVotes)
-    .where(eq(groupVotes.pollId, pollId))
-    .orderBy(asc(groupVotes.createdAt));
 
   return {
     pollId,
