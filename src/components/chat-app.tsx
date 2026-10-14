@@ -88,6 +88,12 @@ export function ChatApp() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ conversationId, message: text }),
         });
+        if (response.status === 429) {
+          const { error } = (await response.json()) as { error: string };
+          setMessages((current) => current.filter((m) => m.id !== PENDING_USER_ID));
+          setDraft(null);
+          return setError(error);
+        }
         if (!response.ok || !response.body) throw new Error(`Request failed (${response.status})`);
         const turn = { id: PENDING_USER_ID };
         for await (const line of readLines(response.body)) {

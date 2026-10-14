@@ -4,7 +4,7 @@ import { db } from "@/db/client";
 import { agentEvents, messages } from "@/db/schema";
 import { agentEventSchema, type StoredAgentEvent } from "@/agent/events";
 import { loadActiveFacts } from "@/agent/facts";
-import { getOrCreateUserId, ownsConversation } from "@/lib/session";
+import { getUserId, ownsConversation } from "@/lib/session";
 
 export interface ConversationState {
   conversationId: string | null;
@@ -20,16 +20,16 @@ export interface ConversationState {
  * durable facts so the inspector shows what Nearby already remembers.
  */
 export async function GET(request: Request) {
-  const userId = await getOrCreateUserId();
+  const userId = await getUserId();
   const requested = new URL(request.url).searchParams.get("conversationId");
   const conversationId = requested && z.uuid().safeParse(requested).success ? requested : null;
 
-  if (conversationId === null || !(await ownsConversation(userId, conversationId))) {
+  if (userId === null || conversationId === null || !(await ownsConversation(userId, conversationId))) {
     const state: ConversationState = {
       conversationId: null,
       messages: [],
       eventsByTurn: {},
-      facts: await loadActiveFacts(userId, null),
+      facts: userId ? await loadActiveFacts(userId, null) : [],
     };
     return Response.json(state);
   }

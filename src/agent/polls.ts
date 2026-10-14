@@ -31,7 +31,7 @@ export async function createPoll(conversationId: string, options: { restaurantId
 }
 
 /** The public view of a poll: options, reasons, and who voted for what. No conversation content. */
-export async function getPollView(pollId: string, viewerId: string): Promise<PollView | null> {
+export async function getPollView(pollId: string, viewerId: string | null): Promise<PollView | null> {
   const options = await db
     .select({
       restaurantId: groupPollOptions.restaurantId,

@@ -261,3 +261,20 @@ export const groupVotes = pgTable(
     }).onDelete("cascade"),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// Rate limiting: fixed-window request counters (see src/lib/rate-limit.ts).
+// ---------------------------------------------------------------------------
+
+export const rateLimitCounters = pgTable(
+  "rate_limit_counters",
+  {
+    // What is being limited, e.g. "chat:ip" or "vote:ip".
+    bucket: text().notNull(),
+    // Who: a user id, an IP address, or "all" for global caps.
+    key: text().notNull(),
+    windowStart: timestamp({ withTimezone: true }).notNull(),
+    count: integer().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.bucket, table.key, table.windowStart] })],
+);

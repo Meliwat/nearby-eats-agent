@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { conversations } from "@/db/schema";
 import type { StreamMessage } from "@/agent/events";
 import { runTurn } from "@/agent/loop";
+import { clientIp, consumeLimits, LIMITS, tooManyRequests } from "@/lib/rate-limit";
 import { getOrCreateUserId, ownsConversation } from "@/lib/session";
 
 /** A turn is a handful of model calls; leave headroom over the usual few seconds. */
@@ -18,7 +19,18 @@ export async function POST(request: Request) {
   const body = chatRequest.safeParse(await request.json().catch(() => null));
   if (!body.success) return Response.json({ error: z.prettifyError(body.error) }, { status: 400 });
 
+  // IP and global limits come first, so a flood of cookieless requests can't even create users.
+  const ip = clientIp(request);
+  const shared = await consumeLimits([
+    { limit: LIMITS.chatPerIp, key: ip },
+    { limit: LIMITS.chatGlobal, key: "all" },
+  ]);
+  if (!shared.allowed) return tooManyRequests(shared, "Nearby is getting a lot of messages right now. Try again in a bit.");
+
   const userId = await getOrCreateUserId();
+  const personal = await consumeLimits([{ limit: LIMITS.chatPerUser, key: userId }]);
+  if (!personal.allowed) return tooManyRequests(personal, "You're texting faster than I can find tables. Give it a minute.");
+
   let conversationId = body.data.conversationId;
   if (conversationId === null) {
     [{ id: conversationId }] = await db.insert(conversations).values({ userId }).returning({ id: conversations.id });

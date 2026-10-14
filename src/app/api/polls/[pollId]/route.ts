@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { castVote, getPollView } from "@/agent/polls";
-import { getOrCreateUserId } from "@/lib/session";
+import { clientIp, consumeLimits, LIMITS, tooManyRequests } from "@/lib/rate-limit";
+import { getOrCreateUserId, getUserId } from "@/lib/session";
 
 const voteRequest = z.strictObject({
   restaurantId: z.number().int(),
@@ -12,7 +13,8 @@ const voteRequest = z.strictObject({
 export async function GET(_request: Request, { params }: RouteContext<"/api/polls/[pollId]">) {
   const { pollId } = await params;
   if (!z.uuid().safeParse(pollId).success) return Response.json({ error: "Poll not found" }, { status: 404 });
-  const view = await getPollView(pollId, await getOrCreateUserId());
+  // Viewing never creates a user; without a cookie there is simply no "your vote" to show.
+  const view = await getPollView(pollId, await getUserId());
   return view ? Response.json(view) : Response.json({ error: "Poll not found" }, { status: 404 });
 }
 
@@ -22,6 +24,9 @@ export async function POST(request: Request, { params }: RouteContext<"/api/poll
   if (!z.uuid().safeParse(pollId).success || !body.success) {
     return Response.json({ error: body.success ? "Poll not found" : z.prettifyError(body.error) }, { status: 400 });
   }
+
+  const limited = await consumeLimits([{ limit: LIMITS.votePerIp, key: clientIp(request) }]);
+  if (!limited.allowed) return tooManyRequests(limited, "Too many votes from this network. Try again in a minute.");
 
   const voterId = await getOrCreateUserId();
   const view = await getPollView(pollId, voterId);

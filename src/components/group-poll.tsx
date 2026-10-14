@@ -53,7 +53,10 @@ export function GroupPollPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ restaurantId, name: name.trim(), note: note.trim() || null }),
     });
-    if (!response.ok) return setError("Couldn't save your vote. Try again?");
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      return setError(response.status === 429 && body?.error ? body.error : "Couldn't save your vote. Try again?");
+    }
     setPoll(await response.json());
   }
 
