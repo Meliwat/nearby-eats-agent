@@ -103,14 +103,8 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
         });
       }
       const started = Date.now();
-      // Text from separate model calls is separate thought; never glue it onto earlier text.
-      let separatorPending = reply.length > 0;
       const timeLeftMs = Math.max(turnStarted + TURN_HARD_LIMIT_MS - Date.now(), 1_000);
-      const message = await callModel(conversation, definitions, mustAnswer, timeLeftMs, (delta) => {
-        if (separatorPending) emit({ kind: "text", delta: "\n\n" });
-        separatorPending = false;
-        emit({ kind: "text", delta });
-      });
+      const message = await callModel(conversation, definitions, mustAnswer, timeLeftMs);
 
       await record({
         type: "model_call",
@@ -126,15 +120,18 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
       });
 
       if (message.stop_reason === "refusal") {
-        // Keep what was already said: earlier steps' tool calls (a pick, a poll) stand and are shown.
-        reply = reply ? `${reply}\n\n${REFUSAL_REPLY}` : REFUSAL_REPLY;
+        reply = REFUSAL_REPLY;
         break;
       }
 
-      const stepText = message.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("");
-      if (stepText) reply = reply ? `${reply}\n\n${stepText}` : stepText;
+      // Only the step that ends the turn speaks to the user. Text written alongside tool calls (say,
+      // "Try Hearth & Hen!" next to a recommend call that then gets refused) is never shown or saved,
+      // so the reply is always written after every check has passed.
       const toolUses = message.content.filter((block) => block.type === "tool_use");
-      if (toolUses.length === 0) break;
+      if (toolUses.length === 0) {
+        reply = message.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("");
+        break;
+      }
       if (message.stop_reason === "max_tokens") throw new Error("Tool input was cut off by max_tokens");
 
       conversation.push({ role: "assistant", content: message.content });
@@ -156,6 +153,7 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
     // The reply is saved; failing to refresh the facts panel must not turn that into an error.
     const factsAfterTurn = await loadActiveFacts(userId, conversationId).catch(() => null);
     if (factsAfterTurn) emit({ kind: "context", facts: factsAfterTurn });
+    emit({ kind: "text", delta: reply });
     emit({ kind: "done", assistantMessageId: assistantMessage.id, text: reply });
   } catch (error) {
     // Full details go to server logs only; the stored event (which the inspector shows) says what kind of failure it was.
@@ -180,7 +178,6 @@ function callModel(
   tools: Anthropic.Beta.BetaTool[],
   mustAnswer: boolean,
   timeLeftMs: number,
-  onText: (delta: string) => void,
 ) {
   const stream = client.beta.messages.stream(
     {
@@ -200,7 +197,6 @@ function callModel(
     },
     { signal: AbortSignal.timeout(timeLeftMs) },
   );
-  stream.on("text", onText);
   return stream.finalMessage();
 }
 
