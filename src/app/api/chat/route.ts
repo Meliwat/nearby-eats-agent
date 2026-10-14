@@ -3,8 +3,8 @@ import { db } from "@/db/client";
 import { conversations } from "@/db/schema";
 import type { StreamMessage } from "@/agent/events";
 import { runTurn } from "@/agent/loop";
-import { clientIp, LIMITS, tooManyRequests } from "@/lib/rate-limit";
-import { consumeLimits } from "@/lib/rate-limit-store";
+import { clientIp, LIMITS, rejectCrossSite, tooManyRequests } from "@/lib/rate-limit";
+import { consumeLimits, deleteExpiredCounters } from "@/lib/rate-limit-store";
 import { getOrCreateUserId, ownsConversation } from "@/lib/session";
 
 /** A turn is a handful of model calls; leave headroom over the usual few seconds. */
@@ -17,20 +17,28 @@ const chatRequest = z.strictObject({
 
 /** Runs one turn and streams it back as NDJSON: one StreamMessage per line. */
 export async function POST(request: Request) {
+  const crossSite = rejectCrossSite(request);
+  if (crossSite) return crossSite;
   const body = chatRequest.safeParse(await request.json().catch(() => null));
   if (!body.success) return Response.json({ error: z.prettifyError(body.error) }, { status: 400 });
 
-  // IP and global limits come first, so a flood of cookieless requests can't even create users.
-  const ip = clientIp(request);
-  const shared = await consumeLimits([
-    { limit: LIMITS.chatPerIp, key: ip },
-    { limit: LIMITS.chatGlobal, key: "all" },
-  ]);
-  if (!shared.allowed) return tooManyRequests(shared, "Nearby is getting a lot of messages right now. Try again in a bit.");
+  // Narrowest limit first, and each stage only runs if the previous one passed, so a single IP or
+  // user over its limit never uses up the global budget everyone shares. The IP check also comes
+  // before user creation, so a flood of cookieless requests can't fill the users table.
+  const perIp = await consumeLimits([{ limit: LIMITS.chatPerIp, key: clientIp(request) }]);
+  if (!perIp.allowed) return tooManyRequests(perIp, "Lots of messages from your network. Try again in a bit.");
 
   const userId = await getOrCreateUserId();
-  const personal = await consumeLimits([{ limit: LIMITS.chatPerUser, key: userId }]);
-  if (!personal.allowed) return tooManyRequests(personal, "You're texting faster than I can find tables. Give it a minute.");
+  const perUser = await consumeLimits([{ limit: LIMITS.chatPerUser, key: userId }]);
+  if (!perUser.allowed) return tooManyRequests(perUser, "You're texting faster than I can find tables. Give it a minute.");
+
+  const global = await consumeLimits([
+    { limit: LIMITS.chatGlobal, key: "all" },
+    { limit: LIMITS.tokensGlobal, key: "all", amount: 0 },
+  ]);
+  if (!global.allowed) return tooManyRequests(global, "Nearby is at capacity for today. Try again tomorrow.");
+  // The first chat of a new day is a cheap, predictable moment to clear out old counters.
+  if (global.counts[0] === 1) await deleteExpiredCounters();
 
   let conversationId = body.data.conversationId;
   if (conversationId === null) {
@@ -43,13 +51,20 @@ export async function POST(request: Request) {
   const turn = { userId, conversationId, text: body.data.message };
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const emit = (message: StreamMessage) => controller.enqueue(encoder.encode(`${JSON.stringify(message)}\n`));
+      let tokensUsed = 0;
+      const emit = (message: StreamMessage) => {
+        if (message.kind === "event" && message.event.type === "model_call") {
+          tokensUsed += message.event.payload.inputTokens + message.event.payload.outputTokens;
+        }
+        controller.enqueue(encoder.encode(`${JSON.stringify(message)}\n`));
+      };
       try {
         await runTurn(turn, emit);
       } catch (error) {
         // runTurn already logged the error to agent_events and told the user; this is for server logs.
         console.error("chat turn failed", { conversationId: turn.conversationId, error });
       } finally {
+        await consumeLimits([{ limit: LIMITS.tokensGlobal, key: "all", amount: tokensUsed }]);
         controller.close();
       }
     },

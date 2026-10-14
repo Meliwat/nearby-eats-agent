@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { castVote, getPollView } from "@/agent/polls";
-import { clientIp, LIMITS, tooManyRequests } from "@/lib/rate-limit";
+import { clientIp, LIMITS, rejectCrossSite, tooManyRequests } from "@/lib/rate-limit";
 import { consumeLimits } from "@/lib/rate-limit-store";
 import { getOrCreateUserId, getUserId } from "@/lib/session";
 
@@ -11,7 +11,9 @@ const voteRequest = z.strictObject({
 });
 
 /** Public by design: anyone with the (unguessable) link can see the poll. No chat content is exposed. */
-export async function GET(_request: Request, { params }: RouteContext<"/api/polls/[pollId]">) {
+export async function GET(request: Request, { params }: RouteContext<"/api/polls/[pollId]">) {
+  const reads = await consumeLimits([{ limit: LIMITS.readPerIp, key: clientIp(request) }]);
+  if (!reads.allowed) return tooManyRequests(reads, "Slow down a little.");
   const { pollId } = await params;
   if (!z.uuid().safeParse(pollId).success) return Response.json({ error: "Poll not found" }, { status: 404 });
   // Viewing never creates a user; without a cookie there is simply no "your vote" to show.
@@ -20,14 +22,20 @@ export async function GET(_request: Request, { params }: RouteContext<"/api/poll
 }
 
 export async function POST(request: Request, { params }: RouteContext<"/api/polls/[pollId]">) {
+  const crossSite = rejectCrossSite(request);
+  if (crossSite) return crossSite;
   const { pollId } = await params;
   const body = voteRequest.safeParse(await request.json().catch(() => null));
   if (!z.uuid().safeParse(pollId).success || !body.success) {
     return Response.json({ error: body.success ? "Poll not found" : z.prettifyError(body.error) }, { status: 400 });
   }
 
-  const limited = await consumeLimits([{ limit: LIMITS.votePerIp, key: clientIp(request) }]);
-  if (!limited.allowed) return tooManyRequests(limited, "Too many votes from this network. Try again in a minute.");
+  const ip = clientIp(request);
+  const limited = await consumeLimits([
+    { limit: LIMITS.votePerIp, key: ip },
+    { limit: LIMITS.votesPerPollPerIp, key: `${pollId}:${ip}` },
+  ]);
+  if (!limited.allowed) return tooManyRequests(limited, "Too many votes from this network. Try again later.");
 
   const voterId = await getOrCreateUserId();
   const view = await getPollView(pollId, voterId);

@@ -19,7 +19,15 @@ describe.skipIf(!process.env.DATABASE_URL)("consumeLimits (database)", () => {
     const check = () => consumeLimits([{ limit, key: "1.2.3.4" }], now);
     expect((await check()).allowed).toBe(true);
     expect((await check()).allowed).toBe(true);
-    expect(await check()).toEqual({ allowed: false, retryAfterSeconds: 45 });
+    expect(await check()).toEqual({ allowed: false, retryAfterSeconds: 45, counts: [3] });
+  });
+
+  it("adds arbitrary amounts and reads with an amount of 0", async () => {
+    const { consumeLimits } = await import("./rate-limit-store");
+    const budget: Limit = { ...limit, max: 1000 };
+    await consumeLimits([{ limit: budget, key: "tokens", amount: 700 }], now);
+    expect((await consumeLimits([{ limit: budget, key: "tokens", amount: 0 }], now)).counts).toEqual([700]);
+    expect((await consumeLimits([{ limit: budget, key: "tokens", amount: 400 }], now)).allowed).toBe(false);
   });
 
   it("counts each key separately", async () => {

@@ -4,6 +4,8 @@ import { db } from "@/db/client";
 import { agentEvents, messages } from "@/db/schema";
 import { agentEventSchema, type StoredAgentEvent } from "@/agent/events";
 import { loadActiveFacts } from "@/agent/facts";
+import { clientIp, LIMITS, tooManyRequests } from "@/lib/rate-limit";
+import { consumeLimits } from "@/lib/rate-limit-store";
 import { getUserId, ownsConversation } from "@/lib/session";
 
 export interface ConversationState {
@@ -20,6 +22,8 @@ export interface ConversationState {
  * durable facts so the inspector shows what Nearby already remembers.
  */
 export async function GET(request: Request) {
+  const reads = await consumeLimits([{ limit: LIMITS.readPerIp, key: clientIp(request) }]);
+  if (!reads.allowed) return tooManyRequests(reads, "Slow down a little.");
   const userId = await getUserId();
   const requested = new URL(request.url).searchParams.get("conversationId");
   const conversationId = requested && z.uuid().safeParse(requested).success ? requested : null;
