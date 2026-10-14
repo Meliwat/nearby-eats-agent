@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { StoredAgentEvent, StreamMessage } from "@/agent/events";
 import type { ConversationState } from "@/app/api/state/route";
+import type { Activity } from "./activity-indicator";
 import { ChatThread } from "./chat-thread";
 import { Inspector } from "./inspector";
 
@@ -18,7 +19,11 @@ export function ChatApp() {
   const [facts, setFacts] = useState<Fact[]>([]);
   /** Fact keys changed during the latest turn, highlighted in the inspector. */
   const [changedKeys, setChangedKeys] = useState<string[]>([]);
+  /** The reply as streamed so far; the thread reveals it with a typewriter. */
   const [draft, setDraft] = useState<string | null>(null);
+  /** The finished reply, committed to the transcript once the typewriter has revealed all of it. */
+  const [finishedReply, setFinishedReply] = useState<ChatMessage | null>(null);
+  const [activity, setActivity] = useState<Activity | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"chat" | "inspector">("chat");
 
@@ -45,6 +50,7 @@ export function ChatApp() {
     switch (message.kind) {
       case "turn_started":
         turn.id = message.userMessageId;
+        setActivity({ kind: "thinking" });
         setConversationId(message.conversationId);
         updateUrl(message.conversationId);
         setMessages((current) => current.map((m) => (m.id === PENDING_USER_ID ? { ...m, id: message.userMessageId } : m)));
@@ -56,20 +62,28 @@ export function ChatApp() {
         if (event.type === "fact_change" && event.payload.action !== "unchanged") {
           setChangedKeys((current) => [...current, event.payload.key]);
         }
+        // A finished tool means the model is up next (or another tool_started follows).
+        if (event.type === "tool_call") setActivity({ kind: "thinking" });
         break;
       }
+      case "tool_started":
+        setActivity({ kind: "tool", name: message.name });
+        break;
       case "text":
+        setActivity(null);
         setDraft((current) => (current ?? "") + message.delta);
         break;
       case "context":
         setFacts(message.facts);
         break;
       case "done":
-        setMessages((current) => [...current, { id: message.assistantMessageId, role: "assistant", content: message.text }]);
-        setDraft(null);
+        setActivity(null);
+        setDraft(message.text);
+        setFinishedReply({ id: message.assistantMessageId, role: "assistant", content: message.text });
         break;
       case "error":
         setError(message.message);
+        setActivity(null);
         setDraft(null);
         break;
     }
@@ -79,7 +93,7 @@ export function ChatApp() {
     async (text: string) => {
       setError(null);
       setChangedKeys([]);
-      setDraft("");
+      setActivity({ kind: "thinking" });
       setMessages((current) => [...current, { id: PENDING_USER_ID, role: "user", content: text }]);
 
       try {
@@ -92,6 +106,7 @@ export function ChatApp() {
           const { error } = (await response.json()) as { error: string };
           setMessages((current) => current.filter((m) => m.id !== PENDING_USER_ID));
           setDraft(null);
+          setActivity(null);
           return setError(error);
         }
         if (!response.ok || !response.body) throw new Error(`Request failed (${response.status})`);
@@ -102,12 +117,20 @@ export function ChatApp() {
       } catch {
         setError("Couldn't reach Nearby. Check your connection and try again.");
         setDraft(null);
+        setActivity(null);
       }
     },
     [conversationId, handleStreamMessage],
   );
 
-  const busy = draft !== null;
+  const commitFinishedReply = useCallback(() => {
+    if (!finishedReply) return;
+    setMessages((current) => [...current, finishedReply]);
+    setFinishedReply(null);
+    setDraft(null);
+  }, [finishedReply]);
+
+  const busy = draft !== null || activity !== null;
 
   return (
     <div className="flex h-dvh flex-col bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
@@ -140,7 +163,17 @@ export function ChatApp() {
 
       <main className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <section className={`${tab === "chat" ? "flex" : "hidden"} min-h-0 flex-col lg:flex`}>
-          <ChatThread messages={messages} eventsByTurn={eventsByTurn} draft={draft} error={error} busy={busy} onSend={send} />
+          <ChatThread
+            messages={messages}
+            eventsByTurn={eventsByTurn}
+            draft={draft}
+            draftFinished={finishedReply !== null}
+            onDraftRevealed={commitFinishedReply}
+            activity={activity}
+            error={error}
+            busy={busy}
+            onSend={send}
+          />
         </section>
         <section
           className={`${tab === "inspector" ? "flex" : "hidden"} min-h-0 flex-col border-stone-200 lg:flex lg:border-l dark:border-stone-800`}

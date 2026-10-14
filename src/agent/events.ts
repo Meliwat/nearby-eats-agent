@@ -47,6 +47,8 @@ export type StoredAgentEvent = AgentEvent & { id: number; createdAt: string };
 export type StreamMessage =
   | { kind: "turn_started"; conversationId: string; userMessageId: string }
   | { kind: "event"; event: StoredAgentEvent }
+  /** A tool began running. UI-only (drives the activity indicator); the finished call is logged as an event. */
+  | { kind: "tool_started"; name: string }
   | { kind: "text"; delta: string }
   | { kind: "context"; facts: { key: string; value: string; scope: "user" | "conversation" }[] }
   | { kind: "done"; assistantMessageId: string; text: string }

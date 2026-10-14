@@ -24,3 +24,74 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
+
+/* Activity indicator: a soft highlight sweeping across the status text. */
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.shimmer-text {
+  background: linear-gradient(90deg, var(--shimmer-base) 35%, var(--shimmer-highlight) 50%, var(--shimmer-base) 65%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2.2s linear infinite;
+}
+
+/* Steam rising off the bowl, three wisps out of phase. */
+@keyframes steam {
+  0% {
+    transform: translateY(2px);
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+}
+
+.steam {
+  animation: steam 1.8s ease-out infinite;
+}
+
+@keyframes bob {
+  50% {
+    transform: translateY(-1px) rotate(-3deg);
+  }
+}
+
+.bob {
+  animation: bob 1.4s ease-in-out infinite;
+  transform-origin: 50% 80%;
+}
+
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+.caret {
+  animation: caret 1s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text,
+  .steam,
+  .bob,
+  .caret {
+    animation: none;
+  }
+  .shimmer-text {
+    color: var(--shimmer-highlight);
+  }
+}

@@ -6,7 +6,12 @@ import type { ChatMessage } from "./chat-app";
 import { buildVisitIcs } from "@/lib/calendar";
 import { localDateAfter, RESTAURANT_TIME_ZONE, toLocalDayMinute } from "@/lib/restaurants/hours";
 import { formatMinute } from "@/lib/restaurants/search";
+import { ActivityIndicator, type Activity } from "./activity-indicator";
 import { PollCard } from "./group-poll";
+
+/** Typewriter pacing: at least ~120 characters a second, and never more than ~20 frames behind. */
+const MIN_CHARS_PER_FRAME = 2;
+const CATCH_UP_FRAMES = 20;
 
 const STARTERS = [
   "Where should I eat tonight?",
@@ -28,18 +33,32 @@ interface Props {
   messages: ChatMessage[];
   eventsByTurn: Record<string, StoredAgentEvent[]>;
   draft: string | null;
+  /** The server finished the reply; once it's fully revealed, onDraftRevealed commits it. */
+  draftFinished: boolean;
+  onDraftRevealed: () => void;
+  activity: Activity | null;
   error: string | null;
   busy: boolean;
   onSend: (text: string) => void;
 }
 
-export function ChatThread({ messages, eventsByTurn, draft, error, busy, onSend }: Props) {
+export function ChatThread({
+  messages,
+  eventsByTurn,
+  draft,
+  draftFinished,
+  onDraftRevealed,
+  activity,
+  error,
+  busy,
+  onSend,
+}: Props) {
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, draft]);
+  }, [messages, draft, activity]);
 
   function submit(text: string) {
     const trimmed = text.trim();
@@ -82,7 +101,8 @@ export function ChatThread({ messages, eventsByTurn, draft, error, busy, onSend 
           );
         })}
 
-        {draft !== null && <Bubble role="assistant" text={draft || "…"} pending />}
+        {draft && <StreamingBubble text={draft} finished={draftFinished} onRevealed={onDraftRevealed} />}
+        {activity && <ActivityIndicator activity={activity} />}
         {error && <p className="text-center text-sm text-red-600">{error}</p>}
         <div ref={bottomRef} />
       </div>
@@ -113,19 +133,56 @@ export function ChatThread({ messages, eventsByTurn, draft, error, busy, onSend 
   );
 }
 
-function Bubble({ role, text, pending = false }: { role: "user" | "assistant"; text: string; pending?: boolean }) {
+function Bubble({ role, text, children }: { role: "user" | "assistant"; text: string; children?: React.ReactNode }) {
   const mine = role === "user";
   return (
     <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
       <p
         className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
           mine ? "rounded-br-sm bg-emerald-600 text-white" : "rounded-bl-sm bg-white shadow-sm dark:bg-stone-900"
-        } ${pending ? "opacity-70" : ""}`}
+        }`}
       >
         {text}
+        {children}
       </p>
     </div>
   );
+}
+
+/** The reply arriving: revealed with a typewriter so a burst of text reads as it streams. */
+function StreamingBubble({ text, finished, onRevealed }: { text: string; finished: boolean; onRevealed: () => void }) {
+  const shown = useTypewriter(text);
+  const revealed = shown.length === text.length;
+
+  useEffect(() => {
+    if (finished && revealed) onRevealed();
+  }, [finished, revealed, onRevealed]);
+
+  return (
+    <Bubble role="assistant" text={shown}>
+      {!revealed || !finished ? <span className="caret ml-0.5 text-emerald-600">▍</span> : null}
+    </Bubble>
+  );
+}
+
+/**
+ * Reveals `target` a few characters per animation frame, faster the further behind it is, so
+ * the model's replies (which arrive in one fast burst after its tool calls) read as they stream.
+ */
+function useTypewriter(target: string): string {
+  const [length, setLength] = useState(0);
+  const reduceMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  useEffect(() => {
+    if (reduceMotion || length >= target.length) return;
+    const frame = requestAnimationFrame(() => {
+      const remaining = target.length - length;
+      setLength(length + Math.max(MIN_CHARS_PER_FRAME, Math.ceil(remaining / CATCH_UP_FRAMES)));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [length, target, reduceMotion]);
+
+  return reduceMotion ? target : target.slice(0, length);
 }
 
 function RecommendationCard({ recommendation }: { recommendation: Recommendation }) {

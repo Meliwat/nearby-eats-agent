@@ -119,6 +119,7 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
       conversation.push({ role: "assistant", content: message.content });
       const toolResults: Anthropic.Beta.BetaToolResultBlockParam[] = [];
       for (const toolUse of toolUses) {
+        emit({ kind: "tool_started", name: toolUse.name });
         const toolStarted = Date.now();
         const outcome = await executeTool(toolUse.name, toolUse.input, schemas, ctx);
         await record({
