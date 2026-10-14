@@ -17,7 +17,6 @@ const THINKING_WORDS = [
   "Foraging",
   "Seasoning to taste",
   "Reading the room",
-  "Consulting the menu gods",
   "Asking the locals",
   "Letting it rest",
 ];

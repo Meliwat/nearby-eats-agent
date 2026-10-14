@@ -97,7 +97,7 @@ When a tool call is wrong, the model gets the reason back as a tool error and co
 
 **Go now.** Every pick comes with the visit time, when the place closes ("closes in 1h 20m" if you're heading out now), directions, and a calendar event. It closes the distance between "sounds good" and actually going.
 
-**Activity indicator.** Instead of a spinner, a small steaming bowl and a line that follows what the agent is really doing: *Checking who's still open*, *Jotting that down*, *Counting the votes*, or, while it thinks, *Consulting the menu gods*. Replies type themselves out as they arrive.
+**Activity indicator.** Instead of a spinner, a small steaming bowl and a line that follows what the agent is really doing: *Checking who's still open*, *Jotting that down*, *Counting the votes*, or, while it thinks, *Asking the locals*. Replies type themselves out as they arrive.
 
 ---
 
