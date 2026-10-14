@@ -9,6 +9,7 @@ import { db } from "../src/db/client";
 import { conversations, users } from "../src/db/schema";
 import type { StoredAgentEvent, StreamMessage } from "../src/agent/events";
 import { runTurn } from "../src/agent/loop";
+import { RESTAURANT_ATTRIBUTES } from "../src/lib/restaurants/attributes";
 
 interface Transcript {
   events: StoredAgentEvent[];
@@ -26,6 +27,12 @@ const toolCalls = (t: Transcript, name: string) =>
   t.events.flatMap((e) => (e.type === "tool_call" && e.payload.name === name && !e.payload.isError ? [e.payload] : []));
 const picks = (t: Transcript) => toolCalls(t, "recommend_restaurant").map((p) => (p.output as { recommended: string }).recommended);
 const lastSearchInput = (t: Transcript) => toolCalls(t, "search_restaurants").at(-1)?.input as Record<string, unknown> | undefined;
+
+/** Every place the data says isn't for kids, or is 21+, at 9:30pm. */
+const NOT_FOR_KIDS_AT_930PM = RESTAURANT_ATTRIBUTES.filter(
+  (r) =>
+    r.kids === "avoid" || r.kids === "not_allowed" || (r.adultsOnlyFromMinute !== null && r.adultsOnlyFromMinute <= 21 * 60 + 30),
+).map((r) => r.name);
 
 const SCENARIOS: Scenario[] = [
   {
@@ -53,7 +60,7 @@ const SCENARIOS: Scenario[] = [
       const input = lastSearchInput(t);
       if (!input?.with_kids) return "searched without with_kids";
       if (picks(t).length === 0) return "made no pick";
-      const bad = picks(t).filter((name) => ["Villa Wings", "Barrio Tacos y Mezcal", "Kinoko Izakaya", "The Cellar Door"].includes(name));
+      const bad = picks(t).filter((name) => NOT_FOR_KIDS_AT_930PM.includes(name));
       return bad.length ? `picked ${bad.join(", ")}` : null;
     },
   },
@@ -107,10 +114,13 @@ async function runScenario(scenario: Scenario): Promise<string | null> {
       if (message.kind === "event") transcript.events.push(message.event);
       if (message.kind === "done") transcript.replies.push(message.text);
     };
-    for (const text of scenario.turns) await runTurn({ userId: user.id, conversationId: conversation.id, text }, collect);
-    // A failed turn stores a placeholder reply that could satisfy a check by accident, so it fails every scenario.
-    const failedTurn = transcript.events.find((e) => e.type === "error" && e.payload.stage === "turn");
-    if (failedTurn?.type === "error") return `a turn failed: ${failedTurn.payload.message}`;
+    // runTurn rethrows after logging a failed turn. Its placeholder reply could satisfy a check by
+    // accident, so a failed turn fails the scenario (and only this scenario).
+    try {
+      for (const text of scenario.turns) await runTurn({ userId: user.id, conversationId: conversation.id, text }, collect);
+    } catch (error) {
+      return `a turn failed: ${error instanceof Error ? error.message : String(error)}`;
+    }
     return scenario.check(transcript);
   } finally {
     await db.delete(users).where(eq(users.id, user.id));
