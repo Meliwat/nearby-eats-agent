@@ -115,7 +115,10 @@ async function runScenario(scenario: Scenario): Promise<string | null> {
 
 async function main() {
   const results = await Promise.all(SCENARIOS.map(async (s) => ({ name: s.name, failure: await runScenario(s) })));
-  for (const { name, failure } of results) console.log(`${failure ? "FAIL" : "PASS"}  ${name}${failure ? `\n      ${failure}` : ""}`);
+  for (const { name, failure } of results) {
+    console.log(`${failure ? "FAIL" : "PASS"}  ${name}`);
+    if (failure) console.log(`      ${failure}`);
+  }
   const failed = results.filter((r) => r.failure).length;
   console.log(`\n${results.length - failed}/${results.length} scenarios passed`);
   if (failed) process.exitCode = 1;
