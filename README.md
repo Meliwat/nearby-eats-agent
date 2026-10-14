@@ -12,23 +12,23 @@
 
 > **You:** where should I eat tonight
 >
-> **Nearby:** Happy to help. What are you in the mood for tonight: tacos, noodles, pizza, something fancier, or something else?
+> **Nearby:** Happy to help! What are you in the mood for tonight: tacos, noodles, pizza, something fancier, or something else?
 >
 > **You:** me and my wife plus our 2 kids, she's vegetarian
 >
-> **Nearby:** Try Tandoor & Co in Irvine. They have a big vegetarian section, with dosas and lots of North Indian dishes, so your wife will have plenty to pick from. They welcome families, and it's open until 10 tonight. I'm assuming you want to be there around 7. Spice is adjustable, so ask for mild for the kids.
+> **Nearby:** Try Mangal Grill in Buena Park. It's open until 10pm tonight. They have a strong vegetarian mezze selection for your wife, and kids are welcome. The plates are meant for sharing, so it works well for four. Get the baklava. I'm assuming you're around 6:30pm. Does that work, or are you too far from Buena Park?
 
-The second message answers a different question than the one asked, and the agent simply works with it. What the inspector showed, abbreviated:
+The second message answers a different question than the one asked, and the agent works with what it got. Every detail in the reply (the mezze, the shared plates, the baklava, the hours) comes from Mangal Grill's listing. What the inspector showed, abbreviated:
 
 ```
-turn 1   search_restaurants     Wed 7pm [no extra constraints]: 38 fit, 12 ruled out
-         → 38 places fit, so it asks one question before picking
+turn 1   search_restaurants     Wed 6:30pm [no extra constraints]: 38 fit, 12 ruled out
 
 turn 2   remember_fact          party_size = 4 people (2 adults, 2 kids)   (this outing)
          remember_fact          party_needs = wife is vegetarian           (this outing)
-         remember_fact          kids = 2 kids coming                       (remembered)
-         search_restaurants     Wed 7pm [vegetarian; with kids; party of 4]: 28 fit, 22 ruled out
-         recommend_restaurant   picked Tandoor & Co                        (checked against that search)
+         remember_fact          kids = has 2 kids coming along             (remembered)
+         remember_fact          timing = tonight                           (this outing)
+         search_restaurants     Wed 6:30pm [vegetarian; with kids; party of 4]: 28 fit, 22 ruled out
+         recommend_restaurant   picked Mangal Grill
 ```
 
 Every recorded pick (the card under the reply) must come from a search the code ran that turn, and the reply is written after all of that turn's tool calls. Code doesn't check that the reply's wording names the same place; the prompt and the evals cover that. Every fact is stored with the message it came from. Every model call, tool call, and change to memory is logged and shown as it happens.
@@ -39,7 +39,7 @@ Every recorded pick (the card under the reply) must come from a search the code 
 
 **Recommendations.** When the agent recommends, it names one place and the reasons it fits *you*: the details you gave, matched against the restaurant's own description, plus one practical note (the wait, the parking, cash only, what to order). `recommend_restaurant` only accepts a candidate from the search the agent ran that turn, so a pick always satisfies every constraint that search applied: open long enough to eat, diets, kids and 21+ rules, party size, budget, area, and cash. Within a conversation, diets, kids, and no-cash carry forward to every later search until the agent drops them by name; party size and budget carry forward until dropped or replaced with a new value; area and time are set per search. Facts remembered from earlier conversations reach the model as context, not as search filters.
 
-**Conversation.** The prompt keeps replies to about sixty words and has the agent recommend early, asking a question only when the answer would change which restaurant wins. These are prompt rules, checked by the behavior evals rather than enforced in code. Otherwise it states its assumption out loud ("I'm assuming you want to be there around 7") and lets you correct it. Fragments, changes of mind, and answers to a different question are all simply new information.
+**Conversation.** The prompt keeps replies to about sixty words and has the agent recommend early, asking a question only when the answer would change which restaurant wins. These are prompt rules, checked by the behavior evals rather than enforced in code. Otherwise it states its assumption out loud ("I'm assuming you're around 6:30pm") and lets you correct it. Fragments, changes of mind, and answers to a different question are all simply new information.
 
 **Memory.** What you reveal becomes a fact: one row each, with provenance. Each kind of fact has a fixed lifetime in code; the model only chooses which kind it learned. *Vegetarian* is remembered for next time; *party of 6 tonight* belongs to this outing only. When you change your mind, the old fact is marked superseded and the new one points back at it, so the history survives. Ten messages in, the agent knows your diet, your kids, your budget, your part of town, and what you've already turned down.
 
@@ -58,7 +58,7 @@ browser ──POST /api/chat──▶ runTurn()                               sr
                               3. loop, at most 8 model calls:
                                    Claude ──tool_use──▶ validate (Zod) ──▶ run ──▶ log
                               4. save the reply
-        ◀──NDJSON stream────  text, tool activity, and every logged event, live
+        ◀──NDJSON stream────  tool activity and every logged event live, then the reply
 ```
 
 The agent loop is written on the Anthropic SDK, with no agent framework. It is the heart of the project, so every step is readable and every step is logged. Context is rebuilt from the database on every turn; no conversation state lives in server memory (only the read-only restaurant catalog is cached). Only the model call that ends the turn speaks to the user: text written alongside tool calls is never shown, so the reply always comes after every check.
@@ -78,7 +78,7 @@ When a tool call is wrong, the model gets the reason back as a tool error and co
 
 ## Design decisions
 
-**Hard constraints in code, soft fit in the model.** Opening hours were parsed from the source file; diets, kids rules, and party limits were hand-checked into flags for all fifty restaurants. Tested functions enforce both. The model handles what code can't: vibe, occasion, and reading each place's full description. The flags matter because the prose is easy to misread: Hearth & Hen's sides are cooked with pork, so its vegetarian flag is *none* and search rules it out for vegetarians, however the model reads the menu. A diet level of *unknown* is kept apart from *none*, so the agent says "worth a call" instead of guessing.
+**Hard constraints in code, soft fit in the model.** Opening hours were parsed from the source file; diets, kids rules, and party limits were hand-checked into flags for all fifty restaurants. Tested functions enforce both. The model handles what code can't: vibe, occasion, and reading each place's full description. The flags matter because the prose is easy to misread: Hearth & Hen's sides are mostly cooked with pork, so its vegetarian flag is *none* and search rules it out for vegetarians, however the model reads the menu. A diet level of *unknown* is kept apart from *none*, so the agent says "worth a call" instead of guessing.
 
 **Past tool calls in the context.** Rebuilding context from the visible transcript alone produced a memorable bug. Later in one conversation, the model saw its earlier picks but not the searches behind them, and told a user to "ignore my earlier picks, I gave them without searching." The log proved it had searched. Each past reply is now preceded by a one-line trace of that turn's tool calls, built from the event log, and that conversation is a permanent behavior test.
 
@@ -102,7 +102,7 @@ When a tool call is wrong, the model gets the reason back as a tool error and co
 
 ## Reliability and security
 
-- **Rate limits:** per network, then per person, then daily caps on turns and tokens that bound the cost of a public link. A request blocked early never touches the shared budget. The token cap is checked before each turn and charged after it, so it can overshoot by about one turn's usage.
+- **Rate limits:** per network, then per person, then daily caps on turns and tokens that bound the cost of a public link. A request blocked early never touches the shared budget. The token cap is checked before each turn and charged after it, so it can overshoot by the usage of the turns already in flight.
 - **Same-site only.** Chat and vote requests must be JSON from the app itself, so no other website can drive them, and no site can frame the pages.
 - **Failure handling.** A slow model call is aborted before the platform's time limit, so the failure is logged and a reply is still saved. Closing the tab doesn't interrupt a turn, a second tab is refused while a turn is running, and an empty reply is never stored.
 - **Anonymous users.** A random id in an httpOnly cookie, with ownership checked on every conversation read.
@@ -117,7 +117,7 @@ When a tool call is wrong, the model gets the reason back as a tool error and co
 | Database | Fact superseding and both uniqueness rules, ownership checks, atomic rate-limit counters, and constraints reloading from the event log, against real Postgres. | Every relevant change, on a throwaway database branch |
 | Behavior | Nine tricky conversations replayed against the real model, judged mostly on what the agent *did* (tool inputs, picks, superseded facts) and partly on its replies: a vague opener, a vegetarian asking about Hearth & Hen, kids at 9:30pm, a solo diner craving Korean BBQ, an anniversary tonight, a change of mind, the "ignore my earlier picks" regression, a vegetarian who later asks for fried chicken, and a tied family poll where one vote comes with "I hate both". | Whenever the agent or its prompt changes |
 
-CI has two workflows. Every push runs lint, the type check, the unit tests, and a build. When agent code, the prompt, the schema, or dependencies change, a second workflow creates a throwaway Neon branch, wipes the user data it copied, and runs all 248 tests (database tests included) plus the 9 behavior scenarios, then deletes the branch. Tests never touch production.
+CI has two workflows. Every push to main and every pull request runs lint, the type check, the unit tests, and a build. When agent code, the prompt, the schema, or dependencies change, a second workflow creates a throwaway Neon branch, wipes the user data it copied, and runs all 252 tests (database tests included) plus the 9 behavior scenarios, then deletes the branch. Tests never touch production.
 
 ---
 
