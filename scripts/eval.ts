@@ -52,6 +52,7 @@ const SCENARIOS: Scenario[] = [
     check: (t) => {
       const input = lastSearchInput(t);
       if (!input?.with_kids) return "searched without with_kids";
+      if (picks(t).length === 0) return "made no pick";
       const bad = picks(t).filter((name) => ["Villa Wings", "Barrio Tacos y Mezcal", "Kinoko Izakaya", "The Cellar Door"].includes(name));
       return bad.length ? `picked ${bad.join(", ")}` : null;
     },
@@ -62,7 +63,7 @@ const SCENARIOS: Scenario[] = [
     check: (t) =>
       picks(t).includes("Seoul Fire BBQ")
         ? "recommended Seoul Fire to one person"
-        : /two|2/.test(t.replies.join(" "))
+        : /\b(two|2)[- ]?(people|person|or more)|minimum of (two|2)|\b(two|2)-person/i.test(t.replies.join(" "))
           ? null
           : "didn't explain the two-person minimum",
   },
@@ -107,6 +108,9 @@ async function runScenario(scenario: Scenario): Promise<string | null> {
       if (message.kind === "done") transcript.replies.push(message.text);
     };
     for (const text of scenario.turns) await runTurn({ userId: user.id, conversationId: conversation.id, text }, collect);
+    // A failed turn stores a placeholder reply that could satisfy a check by accident, so it fails every scenario.
+    const failedTurn = transcript.events.find((e) => e.type === "error" && e.payload.stage === "turn");
+    if (failedTurn?.type === "error") return `a turn failed: ${failedTurn.payload.message}`;
     return scenario.check(transcript);
   } finally {
     await db.delete(users).where(eq(users.id, user.id));
