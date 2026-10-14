@@ -115,7 +115,9 @@ function buildInputSchemas(cities: string[]) {
     }),
     update_recommendation: z.strictObject({
       restaurant_id: z.number().int(),
-      status: z.enum(["accepted", "rejected"]).describe("accepted: they're going. rejected: they passed on it."),
+      status: z
+        .enum(["accepted", "rejected", "suggested"])
+        .describe("accepted: they're going. rejected: they said no to this place. suggested: they want to reconsider a place they passed on."),
     }),
     start_group_poll: z.strictObject({
       options: z
@@ -340,6 +342,8 @@ async function runUpdateRecommendation(
   if (!latest) return failure(`Restaurant ${input.restaurant_id} was not recommended in this conversation.`);
 
   await db.update(recommendations).set({ status: input.status }).where(eq(recommendations.id, latest.id));
+  // Bringing a place back makes it searchable again from the next search on.
+  if (input.status !== "rejected") ctx.rejectedIds.delete(input.restaurant_id);
   if (input.status === "rejected") {
     ctx.rejectedIds.add(input.restaurant_id);
     // Also move it out of this turn's candidates, so it can't be recommended again before the next search.
