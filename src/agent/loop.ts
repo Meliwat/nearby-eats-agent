@@ -6,7 +6,7 @@ import { buildContextMessage, loadRecommendations, loadTranscript, SYSTEM_PROMPT
 import { agentEventSchema, type AgentEvent, type StreamMessage } from "./events";
 import { loadActiveFacts } from "./facts";
 import { summarizePolls } from "./polls";
-import { buildTools, executeTool, type ToolContext } from "./tools";
+import { buildTools, executeTool, type ToolContext, type ToolSchemas } from "./tools";
 
 export const MODEL = "claude-sonnet-5-5";
 /** Chat replies need speed more than deep reasoning; hard constraints are enforced in code. */
@@ -92,27 +92,13 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
         });
       }
       const started = Date.now();
-      const stream = client.beta.messages.stream({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-        // Also cache the growing conversation, so each step in a turn re-reads earlier steps from cache.
-        cache_control: { type: "ephemeral" },
-        tools: definitions,
-        tool_choice: mustAnswer ? { type: "none" } : { type: "auto" },
-        messages: conversation,
-        output_config: { effort: EFFORT },
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
-      });
       // Text from separate model calls is separate thought; never glue it onto earlier text.
       let separatorPending = reply.length > 0;
-      stream.on("text", (delta) => {
+      const message = await callModel(conversation, definitions, mustAnswer, (delta) => {
         if (separatorPending) emit({ kind: "text", delta: "\n\n" });
         separatorPending = false;
         emit({ kind: "text", delta });
       });
-      const message = await stream.finalMessage();
 
       await record({
         type: "model_call",
@@ -138,26 +124,8 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
       if (message.stop_reason === "max_tokens") throw new Error("Tool input was cut off by max_tokens");
 
       conversation.push({ role: "assistant", content: message.content });
-      const toolResults: Anthropic.Beta.BetaToolResultBlockParam[] = [];
-      for (const toolUse of toolUses) {
-        emit({ kind: "tool_started", name: toolUse.name });
-        const toolStarted = Date.now();
-        const outcome = await executeTool(toolUse.name, toolUse.input, schemas, ctx);
-        await record({
-          type: "tool_call",
-          durationMs: Date.now() - toolStarted,
-          payload: { toolUseId: toolUse.id, name: toolUse.name, input: toolUse.input, output: outcome.output, isError: outcome.isError },
-        });
-        for (const change of outcome.factChanges) await record({ type: "fact_change", durationMs: null, payload: change });
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: toolUse.id,
-          content: JSON.stringify(outcome.output),
-          is_error: outcome.isError,
-        });
-      }
       // All results for one assistant message go back in a single user message.
-      conversation.push({ role: "user", content: toolResults });
+      conversation.push({ role: "user", content: await runToolCalls(toolUses, schemas, ctx, record, emit) });
     }
 
     // An empty assistant message would make every later request in this conversation fail.
@@ -185,6 +153,62 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
     emit({ kind: "error", message: FAILURE_REPLY });
     throw error;
   }
+}
+
+/** One streamed model call. With `mustAnswer`, tools are withheld so the model has to reply in words. */
+function callModel(
+  conversation: Anthropic.Beta.BetaMessageParam[],
+  tools: Anthropic.Beta.BetaTool[],
+  mustAnswer: boolean,
+  onText: (delta: string) => void,
+) {
+  const stream = client.beta.messages.stream({
+    model: MODEL,
+    max_tokens: MAX_TOKENS,
+    system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+    // Also cache the growing conversation, so each step in a turn re-reads earlier steps from cache.
+    cache_control: { type: "ephemeral" },
+    tools,
+    tool_choice: mustAnswer ? { type: "none" } : { type: "auto" },
+    messages: conversation,
+    output_config: { effort: EFFORT },
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+  });
+  stream.on("text", onText);
+  return stream.finalMessage();
+}
+
+/**
+ * Runs one assistant message's tool calls in order (a later call may depend on an earlier one,
+ * e.g. search then recommend), logging each call and any fact changes it made.
+ */
+async function runToolCalls(
+  toolUses: Anthropic.Beta.BetaToolUseBlock[],
+  schemas: ToolSchemas,
+  ctx: ToolContext,
+  record: (event: AgentEvent) => Promise<void>,
+  emit: (message: StreamMessage) => void,
+): Promise<Anthropic.Beta.BetaToolResultBlockParam[]> {
+  const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
+  for (const toolUse of toolUses) {
+    emit({ kind: "tool_started", name: toolUse.name });
+    const started = Date.now();
+    const outcome = await executeTool(toolUse.name, toolUse.input, schemas, ctx);
+    await record({
+      type: "tool_call",
+      durationMs: Date.now() - started,
+      payload: { toolUseId: toolUse.id, name: toolUse.name, input: toolUse.input, output: outcome.output, isError: outcome.isError },
+    });
+    for (const change of outcome.factChanges) await record({ type: "fact_change", durationMs: null, payload: change });
+    results.push({
+      type: "tool_result",
+      tool_use_id: toolUse.id,
+      content: JSON.stringify(outcome.output),
+      is_error: outcome.isError,
+    });
+  }
+  return results;
 }
 
 /** A short, safe description of a failure: the kind of error, never raw messages that might include SQL or internals. */
