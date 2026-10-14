@@ -1,25 +1,32 @@
 name: Agent evals
 
 # Evals call the real model (a few cents per run), so they only run when agent behavior could
-# have changed, or on demand from the Actions tab.
+# have changed (including dependency bumps), or on demand from the Actions tab. This job also runs
+# the database tests, which the free CI job skips.
 on:
   push:
     branches: [main]
     paths:
       - "prompts/**"
       - "src/agent/**"
-      - "src/lib/restaurants/**"
+      - "src/lib/**"
       - "src/db/**"
       - "drizzle/**"
-      - "scripts/eval.ts"
+      - "scripts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/evals.yml"
   pull_request:
     paths:
       - "prompts/**"
       - "src/agent/**"
-      - "src/lib/restaurants/**"
+      - "src/lib/**"
       - "src/db/**"
       - "drizzle/**"
-      - "scripts/eval.ts"
+      - "scripts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/evals.yml"
   workflow_dispatch:
 
 permissions:
