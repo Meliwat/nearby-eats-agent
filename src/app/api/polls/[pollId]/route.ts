@@ -25,10 +25,9 @@ export async function POST(request: Request, { params }: RouteContext<"/api/poll
   const crossSite = rejectCrossSite(request);
   if (crossSite) return crossSite;
   const { pollId } = await params;
+  if (!z.uuid().safeParse(pollId).success) return Response.json({ error: "Poll not found" }, { status: 404 });
   const body = voteRequest.safeParse(await request.json().catch(() => null));
-  if (!z.uuid().safeParse(pollId).success || !body.success) {
-    return Response.json({ error: body.success ? "Poll not found" : z.prettifyError(body.error) }, { status: 400 });
-  }
+  if (!body.success) return Response.json({ error: z.prettifyError(body.error) }, { status: 400 });
 
   const ip = clientIp(request);
   const limited = await consumeLimits([
