@@ -73,4 +73,4 @@ jobs:
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           api_key: ${{ secrets.NEON_API_KEY }}
-          branch_id: ${{ steps.branch.outputs.branch_id }}
+          branch: ${{ steps.branch.outputs.branch_id }}
