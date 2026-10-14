@@ -14,6 +14,7 @@ export async function consumeLimits(
   checks: { limit: Limit; key: string; amount?: number }[],
   now = new Date(),
 ): Promise<LimitResult> {
+  // Destructured only because db.batch's type demands a non-empty tuple.
   const [first, ...rest] = checks.map(({ limit, key, amount = 1 }) =>
     db
       .insert(rateLimitCounters)
