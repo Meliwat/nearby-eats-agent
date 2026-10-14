@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // The system prompt is read from disk at runtime, so ship it with the chat function.
+  outputFileTracingIncludes: { "/api/chat": ["./prompts/**/*"] },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

@@ -40,18 +40,18 @@ export interface FactChange {
   scope: "user" | "conversation";
 }
 
-/** Facts in effect for this conversation: durable user facts plus this conversation's situational ones. */
-export async function loadActiveFacts(userId: string, conversationId: string): Promise<ActiveFact[]> {
+/**
+ * Facts in effect for this conversation: durable user facts plus this conversation's situational
+ * ones. With no conversation yet (a returning user's empty chat), only the durable facts apply.
+ */
+export async function loadActiveFacts(userId: string, conversationId: string | null): Promise<ActiveFact[]> {
+  const inScope = conversationId
+    ? or(eq(userFacts.scope, "user"), eq(userFacts.conversationId, conversationId))
+    : eq(userFacts.scope, "user");
   return db
     .select({ key: userFacts.key, value: userFacts.value, scope: userFacts.scope })
     .from(userFacts)
-    .where(
-      and(
-        eq(userFacts.userId, userId),
-        eq(userFacts.status, "active"),
-        or(eq(userFacts.scope, "user"), eq(userFacts.conversationId, conversationId)),
-      ),
-    )
+    .where(and(eq(userFacts.userId, userId), eq(userFacts.status, "active"), inScope))
     .orderBy(userFacts.createdAt);
 }
 

@@ -82,7 +82,13 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
       });
-      stream.on("text", (delta) => emit({ kind: "text", delta }));
+      // Text from separate model calls is separate thought; never glue it onto earlier text.
+      let separatorPending = reply.length > 0;
+      stream.on("text", (delta) => {
+        if (separatorPending) emit({ kind: "text", delta: "\n\n" });
+        separatorPending = false;
+        emit({ kind: "text", delta });
+      });
       const message = await stream.finalMessage();
 
       await record({
@@ -102,7 +108,8 @@ export async function runTurn(input: TurnInput, emit: (message: StreamMessage) =
         break;
       }
 
-      reply += message.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("");
+      const stepText = message.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("");
+      if (stepText) reply = reply ? `${reply}\n\n${stepText}` : stepText;
       const toolUses = message.content.filter((block) => block.type === "tool_use");
       if (toolUses.length === 0) break;
       if (message.stop_reason === "max_tokens") throw new Error("Tool input was cut off by max_tokens");
