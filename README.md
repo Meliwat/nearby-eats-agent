@@ -62,7 +62,7 @@ browser ──POST /api/chat──▶ runTurn()                               sr
         ◀──NDJSON stream────  text, tool activity, and every logged event, live
 ```
 
-The agent loop is written by hand on the Anthropic SDK, with no agent framework. It is the heart of the project, so every step is readable and every step is logged. Context is rebuilt from the database on every turn; nothing lives in server memory.
+The agent loop is written on the Anthropic SDK, with no agent framework. It is the heart of the project, so every step is readable and every step is logged. Context is rebuilt from the database on every turn; nothing lives in server memory.
 
 | Tool | What the code guarantees |
 |---|---|
