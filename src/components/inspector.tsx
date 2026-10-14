@@ -1,6 +1,7 @@
 "use client";
 
 import type { StoredAgentEvent } from "@/agent/events";
+import { summarizeToolCall } from "@/agent/tool-summary";
 import type { ChatMessage, Fact } from "./chat-app";
 
 interface Props {
@@ -118,30 +119,6 @@ function EventRow({ event }: { event: StoredAgentEvent }) {
           error in {event.payload.stage}: {event.payload.message}
         </li>
       );
-  }
-}
-
-/** One readable line per tool call, so the timeline can be scanned without expanding anything. */
-function summarizeToolCall(payload: Extract<StoredAgentEvent, { type: "tool_call" }>["payload"]): string {
-  const output = payload.output as Record<string, unknown>;
-  if (payload.isError) return String(output.error);
-  switch (payload.name) {
-    case "search_restaurants":
-      return `${output.arrival}: ${output.candidate_count} fit, ${(output.excluded as unknown[]).length} ruled out`;
-    case "recommend_restaurant":
-      return `picked ${output.recommended}`;
-    case "remember_fact":
-      return `${output.key} = ${output.value}`;
-    case "update_recommendation":
-      return `${output.status}`;
-    case "get_restaurant":
-      return `${(output as unknown as unknown[]).length} match(es)`;
-    case "start_group_poll":
-      return `poll: ${(output.options as string[]).join(" / ")}`;
-    case "get_poll_results":
-      return (output.options as { name: string; votes: number }[]).map((o) => `${o.name} ${o.votes}`).join(", ");
-    default:
-      return "";
   }
 }
 

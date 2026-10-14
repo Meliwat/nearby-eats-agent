@@ -1,10 +1,11 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { messages, recommendations, restaurants } from "@/db/schema";
+import { agentEvents, messages, recommendations, restaurants } from "@/db/schema";
 import type { ActiveFact } from "./facts";
+import { buildActionNote, type ToolCallPayload } from "./tool-summary";
 import { RESTAURANT_TIME_ZONE as TIME_ZONE } from "@/lib/restaurants/hours";
 
 /** Read once per server instance. next.config.ts includes prompts/ in the deployed function. */
@@ -13,17 +14,41 @@ export const SYSTEM_PROMPT = readFileSync(path.join(process.cwd(), "prompts/syst
 /** How much of the chat the model re-reads each turn; older context lives on in remembered facts. */
 const MAX_TRANSCRIPT_MESSAGES = 30;
 
-/** The most recent visible transcript, oldest first, as API messages. Starts with a user message, skips empty rows. */
+/**
+ * The most recent conversation, oldest first, as API messages: starts with a user message and
+ * skips empty rows. Before each past reply goes a short system note of what the agent did in that
+ * turn, built from agent_events, so the model remembers its own actions (not just its words).
+ */
 export async function loadTranscript(conversationId: string): Promise<Anthropic.Beta.BetaMessageParam[]> {
   const rows = await db
-    .select({ role: messages.role, content: messages.content })
+    .select({ id: messages.id, role: messages.role, content: messages.content })
     .from(messages)
     .where(eq(messages.conversationId, conversationId))
     .orderBy(desc(messages.createdAt))
     .limit(MAX_TRANSCRIPT_MESSAGES);
   const recent = rows.reverse().filter((row) => row.content.trim());
   const firstUser = recent.findIndex((row) => row.role === "user");
-  return recent.slice(Math.max(firstUser, 0)).map((row) => ({ role: row.role, content: row.content }));
+  const transcript = recent.slice(Math.max(firstUser, 0));
+
+  const userIds = transcript.filter((row) => row.role === "user").map((row) => row.id);
+  const toolCalls = userIds.length
+    ? await db
+        .select({ turnMessageId: agentEvents.turnMessageId, payload: agentEvents.payload })
+        .from(agentEvents)
+        .where(and(inArray(agentEvents.turnMessageId, userIds), eq(agentEvents.type, "tool_call")))
+        .orderBy(asc(agentEvents.id))
+    : [];
+
+  return transcript.flatMap((row, index): Anthropic.Beta.BetaMessageParam[] => {
+    const previous = transcript[index - 1];
+    if (row.role === "assistant" && previous?.role === "user") {
+      const calls = toolCalls.filter((c) => c.turnMessageId === previous.id).map((c) => c.payload as ToolCallPayload);
+      const note = buildActionNote(calls);
+      // A mid-conversation system note must sit between a user message and an assistant reply, as here.
+      if (note) return [{ role: "system", content: note }, { role: "assistant", content: row.content }];
+    }
+    return [{ role: row.role, content: row.content }];
+  });
 }
 
 export interface RecommendationSummary {
